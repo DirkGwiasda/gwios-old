@@ -1,0 +1,11 @@
+.gwios-recurring-item-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--gwios-text-muted);
+    font-size: 13.5px;
+}
+
+.gwios-recurring-item-label-icon {
+    flex-shrink: 0;
+}

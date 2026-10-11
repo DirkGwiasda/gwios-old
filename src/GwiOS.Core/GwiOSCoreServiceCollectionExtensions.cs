@@ -12,18 +12,24 @@ using GwiOS.Core.CrossCutting.Persons.Domain.Managers.PersonManagement.Contracts
 using GwiOS.Core.CrossCutting.Persons.Infrastructure;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.MonthReviewManagement;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.MonthReviewManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.AvailableBalance;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.AvailableBalance.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.CategoryDeletion;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.CategoryDeletion.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemContinuation;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemContinuation.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemForecast;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemForecast.Contracts;
 using GwiOS.Core.Haushaltsbuch.Infrastructure;
@@ -72,8 +78,9 @@ public static class GwiOSCoreServiceCollectionExtensions
     /// <see cref="ISatelliteRepository.EnsureStorageCreatedAsync"/>,
     /// <see cref="ICategoryRepository.EnsureStorageCreatedAsync"/>,
     /// <see cref="IRecurringItemRepository.EnsureStorageCreatedAsync"/>,
-    /// <see cref="IBookingRepository.EnsureStorageCreatedAsync"/> and
-    /// <see cref="IMonthReviewRepository.EnsureStorageCreatedAsync"/>.
+    /// <see cref="IBookingRepository.EnsureStorageCreatedAsync"/>,
+    /// <see cref="IMonthReviewRepository.EnsureStorageCreatedAsync"/> and
+    /// <see cref="IBookingTemplateRepository.EnsureStorageCreatedAsync"/>.
     /// </param>
     /// <returns>The same container, for chaining.</returns>
     public static IServiceCollection AddGwiOSCore(this IServiceCollection services, string connectionString)
@@ -169,10 +176,16 @@ public static class GwiOSCoreServiceCollectionExtensions
         services.AddScoped<IMonthReviewValidator, MonthReviewValidator>();
         services.AddScoped<IMonthReviewManager, MonthReviewManager>();
 
+        services.AddScoped<IBookingTemplateRepository, BookingTemplatePostgresRepository>();
+        services.AddScoped<IBookingTemplateValidator, BookingTemplateValidator>();
+        services.AddScoped<IBookingTemplateManager, BookingTemplateManager>();
+
         services.AddScoped<ICategoryDeletionWorkflow, CategoryDeletionWorkflow>();
         services.AddScoped<IRecurringBookingGenerationWorkflow, RecurringBookingGenerationWorkflow>();
         services.AddScoped<IHaushaltsbuchOverviewWorkflow, HaushaltsbuchOverviewWorkflow>();
         services.AddScoped<IRecurringItemForecastWorkflow, RecurringItemForecastWorkflow>();
+        services.AddScoped<IAvailableBalanceWorkflow, AvailableBalanceWorkflow>();
+        services.AddScoped<IRecurringItemContinuationWorkflow, RecurringItemContinuationWorkflow>();
     }
 
     // Satellites answer within milliseconds in the LAN; a satellite that does not must not hold up the others for long.

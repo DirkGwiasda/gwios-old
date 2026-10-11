@@ -104,6 +104,28 @@ public sealed class GetDueDatesTests
         Assert.Equal([new DateOnly(2026, 10, 1)], dueDates);
     }
 
+    [Fact]
+    public void LeavesOutDueDatesBeforeTheStartOfTheValidity()
+    {
+        RecurringItem item = CreateItem(RecurringInterval.Weekly, dueDay: 1);
+        item.ValidFrom = new DateOnly(2026, 10, 15);
+
+        IReadOnlyList<DateOnly> dueDates = _scheduler.GetDueDates(item, new DateOnly(2026, 10, 1));
+
+        Assert.Equal([new DateOnly(2026, 10, 15), new DateOnly(2026, 10, 22)], dueDates);
+    }
+
+    [Fact]
+    public void LeavesOutDueDatesAfterTheEndOfTheValidity()
+    {
+        RecurringItem item = CreateItem(RecurringInterval.Weekly, dueDay: 1);
+        item.ValidUntil = new DateOnly(2026, 10, 14);
+
+        IReadOnlyList<DateOnly> dueDates = _scheduler.GetDueDates(item, new DateOnly(2026, 10, 1));
+
+        Assert.Equal([new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 8)], dueDates);
+    }
+
     private static RecurringItem CreateItem(RecurringInterval interval, int dueDay, int startMonth = 0)
         => new()
         {

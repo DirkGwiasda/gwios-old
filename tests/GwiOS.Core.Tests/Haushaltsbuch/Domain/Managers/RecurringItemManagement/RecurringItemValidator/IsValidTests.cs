@@ -99,6 +99,41 @@ public sealed class IsValidTests
     }
 
     [Fact]
+    public void ReturnsFalseWithAnError_WhenTheValidityEndsBeforeItStarts()
+    {
+        RecurringItem recurringItem = CreateValidRecurringItem();
+        recurringItem.ValidFrom = new DateOnly(2026, 11, 1);
+        recurringItem.ValidUntil = new DateOnly(2026, 10, 31);
+
+        bool isValid = _recurringItemValidator.IsValid(recurringItem, out List<string> validationErrors);
+
+        Assert.False(isValid);
+        Assert.Contains("The end of the validity must not be before its start.", validationErrors);
+    }
+
+    [Fact]
+    public void ReturnsTrue_WhenTheValidityStartsAndEndsOnTheSameDay()
+    {
+        RecurringItem recurringItem = CreateValidRecurringItem();
+        recurringItem.ValidFrom = new DateOnly(2026, 11, 1);
+        recurringItem.ValidUntil = new DateOnly(2026, 11, 1);
+
+        Assert.True(_recurringItemValidator.IsValid(recurringItem, out _));
+    }
+
+    [Fact]
+    public void ReturnsFalseWithAnError_WhenTheRecurringItemIsItsOwnPredecessor()
+    {
+        RecurringItem recurringItem = CreateValidRecurringItem();
+        recurringItem.PredecessorId = recurringItem.Id;
+
+        bool isValid = _recurringItemValidator.IsValid(recurringItem, out List<string> validationErrors);
+
+        Assert.False(isValid);
+        Assert.Contains("The recurring item must not be its own predecessor.", validationErrors);
+    }
+
+    [Fact]
     public void LogsAWarningWithTheRecurringItemIdAndTheErrors_WhenTheRecurringItemIsInvalid()
     {
         RecurringItem recurringItem = CreateValidRecurringItem();

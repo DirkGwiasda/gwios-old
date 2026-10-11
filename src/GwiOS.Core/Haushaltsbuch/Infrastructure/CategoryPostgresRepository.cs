@@ -30,21 +30,25 @@ internal sealed class CategoryPostgresRepository(
             CONSTRAINT fk_haushaltsbuch_categories_parent FOREIGN KEY (parent_id)
                 REFERENCES haushaltsbuch.categories (id)
         );
+
+        -- Added after the table was first deployed; ADD COLUMN IF NOT EXISTS extends existing tables as well.
+        ALTER TABLE haushaltsbuch.categories
+            ADD COLUMN IF NOT EXISTS is_favorite boolean NOT NULL DEFAULT false;
         """;
 
     private const string InsertSql = """
-        INSERT INTO haushaltsbuch.categories (id, name, type, parent_id, color)
-        VALUES (@id, @name, @type, @parent_id, @color)
+        INSERT INTO haushaltsbuch.categories (id, name, type, parent_id, color, is_favorite)
+        VALUES (@id, @name, @type, @parent_id, @color, @is_favorite)
         """;
 
     private const string UpdateSql = """
         UPDATE haushaltsbuch.categories
-        SET name = @name, type = @type, parent_id = @parent_id, color = @color
+        SET name = @name, type = @type, parent_id = @parent_id, color = @color, is_favorite = @is_favorite
         WHERE id = @id
         """;
 
     private const string SelectAllSql = """
-        SELECT id, name, type, parent_id, color
+        SELECT id, name, type, parent_id, color, is_favorite
         FROM haushaltsbuch.categories
         ORDER BY type, name
         """;
@@ -109,6 +113,7 @@ internal sealed class CategoryPostgresRepository(
         command.Parameters.AddWithValue("type", (short)category.Type);
         command.Parameters.AddWithValue("parent_id", NpgsqlDbType.Uuid, (object?)category.ParentId ?? DBNull.Value);
         command.Parameters.AddWithValue("color", NpgsqlDbType.Text, (object?)category.Color ?? DBNull.Value);
+        command.Parameters.AddWithValue("is_favorite", category.IsFavorite);
     }
 
     private static Category ReadCategory(NpgsqlDataReader reader)
@@ -118,7 +123,8 @@ internal sealed class CategoryPostgresRepository(
             Name = reader.GetString("name"),
             Type = (CategoryType)reader.GetFieldValue<short>("type"),
             ParentId = reader.IsDBNull("parent_id") ? null : reader.GetGuid("parent_id"),
-            Color = reader.IsDBNull("color") ? null : reader.GetString("color")
+            Color = reader.IsDBNull("color") ? null : reader.GetString("color"),
+            IsFavorite = reader.GetBoolean("is_favorite")
         };
 
     private static Dictionary<string, string> CreateCategoryIdData(Guid categoryId)

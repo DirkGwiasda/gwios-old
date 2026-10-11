@@ -80,6 +80,11 @@
     line-height: 1;
 }
 
+.gwios-category-actions .gwios-category-favorite {
+    font-size: 13px;
+    font-weight: 400;
+}
+
 .gwios-category-actions .gwios-category-add {
     font-size: 13px;
     font-weight: 400;

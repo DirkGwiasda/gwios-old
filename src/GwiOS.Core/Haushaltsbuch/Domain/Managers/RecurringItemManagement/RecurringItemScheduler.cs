@@ -21,8 +21,14 @@ internal sealed class RecurringItemScheduler : IRecurringItemScheduler
         IEnumerable<int> dueDays = recurringItem.Interval == RecurringInterval.Weekly
             ? WeeklyDueDays
             : [recurringItem.DueDay];
-        return [.. dueDays.Select(day => new DateOnly(month.Year, month.Month, Math.Min(day, lastDay)))];
+        return [.. dueDays
+            .Select(day => new DateOnly(month.Year, month.Month, Math.Min(day, lastDay)))
+            .Where(date => IsValidOn(recurringItem, date))];
     }
+
+    public bool IsValidOn(RecurringItem recurringItem, DateOnly date)
+        => ((recurringItem.ValidFrom is null) || (date >= recurringItem.ValidFrom))
+            && ((recurringItem.ValidUntil is null) || (date <= recurringItem.ValidUntil));
 
     private static bool IsDueInMonth(RecurringItem recurringItem, int monthIndex0)
         => recurringItem.Interval switch

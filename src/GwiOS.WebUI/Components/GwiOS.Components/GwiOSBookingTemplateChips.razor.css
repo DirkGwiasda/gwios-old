@@ -1,0 +1,9 @@
+.gwios-booking-template-chips-empty {
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px dashed rgba(0, 136, 255, 0.3);
+    border-radius: var(--gwios-radius);
+    color: var(--gwios-text-dim);
+    font-size: 13px;
+    line-height: 1.5;
+}

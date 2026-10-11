@@ -1,5 +1,9 @@
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
@@ -49,17 +53,128 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         string description = TestDataSeeder.CreateUniqueName("e2e-booking");
 
         await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
-        await _page.GetByRole(AriaRole.Button, new() { Name = "+ Neue Buchung" }).ClickAsync();
-        await _page.Locator("#booking-edit-amount").FillAsync("42.50");
-        await _page.Locator("#booking-edit-category").SelectOptionAsync(category.Id.ToString());
-        await _page.Locator("#booking-edit-description").FillAsync(description);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Speichern" }).ClickAsync();
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.Locator("#booking-edit-amount").FillAsync("42.50");
+        await PickCategoryBySearchAsync(dialog, category);
+        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await ClickSaveAsync(dialog);
 
         ILocator row = _page.Locator("tr", new PageLocatorOptions { HasText = description });
         await Expect(row).ToBeVisibleAsync();
         await Expect(row).ToContainTextAsync("42,50");
 
         await CleanUpBookingAsync(seeder, description);
+    }
+
+    [Fact]
+    public async Task AFavoriteFillsDescriptionAndCategoryAndTheAmountMayBeACalculation()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        BookingTemplate template = await CreateBookingTemplateAsync(seeder, category);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.GetByRole(AriaRole.Button, new() { Name = $"★{template.Description}" }).ClickAsync();
+
+        await Expect(dialog.Locator("#booking-edit-description")).ToHaveValueAsync(template.Description);
+        await Expect(dialog.Locator(".gwios-category-picker-selected")).ToContainTextAsync(category.Name);
+        await Expect(dialog.Locator("#booking-edit-amount")).ToBeFocusedAsync();
+
+        await dialog.Locator("#booking-edit-amount").FillAsync("12,50+3,20");
+        await Expect(dialog.Locator(".gwios-amount-box-result")).ToHaveTextAsync("= 15,70 €");
+        await ClickSaveAsync(dialog);
+
+        ILocator row = _page.Locator("tr", new PageLocatorOptions { HasText = template.Description });
+        await Expect(row).ToBeVisibleAsync();
+        await Expect(row).ToContainTextAsync("15,70");
+
+        await CleanUpBookingAsync(seeder, template.Description);
+    }
+
+    [Fact]
+    public async Task ThePinnedFavoriteCategoryCanBePickedWithOneTap()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        category.IsFavorite = true;
+        await seeder.Services.GetRequiredService<ICategoryManager>().UpdateCategoryAsync(category);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.Locator(".gwios-category-picker .gwios-chip", new() { HasText = category.Name }).ClickAsync();
+
+        await Expect(dialog.Locator(".gwios-category-picker-selected")).ToContainTextAsync(category.Name);
+    }
+
+    [Fact]
+    public async Task TheUndoBarTakesBackTheBookingJustSaved()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = TestDataSeeder.CreateUniqueName("e2e-undo");
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.Locator("#booking-edit-amount").FillAsync("9,99");
+        await PickCategoryBySearchAsync(dialog, category);
+        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await ClickSaveAsync(dialog);
+
+        ILocator row = _page.Locator("tr", new PageLocatorOptions { HasText = description });
+        await Expect(row).ToBeVisibleAsync();
+        ILocator undoBar = _page.Locator(".gwios-undo-bar");
+        await Expect(undoBar).ToContainTextAsync($"{description} · −9,99 € gebucht");
+        await undoBar.GetByRole(AriaRole.Button, new() { Name = "Rückgängig" }).ClickAsync();
+
+        await Expect(undoBar).ToContainTextAsync("Buchung zurückgenommen");
+        await Expect(row).ToHaveCountAsync(0);
+    }
+
+    [Fact]
+    public async Task SaveAndContinueKeepsTheDialogOpenWithAnEmptyFormAndTheSameDate()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = TestDataSeeder.CreateUniqueName("e2e-next");
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Gestern", Exact = true }).ClickAsync();
+        await dialog.Locator("#booking-edit-amount").FillAsync("3,10");
+        await PickCategoryBySearchAsync(dialog, category);
+        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Speichern & weitere" }).ClickAsync();
+
+        await Expect(dialog.Locator(".gwios-booking-flash")).ToContainTextAsync("bereit für die nächste");
+        await Expect(dialog.Locator("#booking-edit-amount")).ToHaveValueAsync(string.Empty);
+        await Expect(dialog.Locator("#booking-edit-description")).ToHaveValueAsync(string.Empty);
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Gestern", Exact = true }))
+            .ToHaveAttributeAsync("aria-pressed", "true");
+
+        await CleanUpBookingAsync(seeder, description);
+    }
+
+    [Fact]
+    public async Task TheStarInTheDialogPinsDescriptionAndCategoryAsFavorite()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = TestDataSeeder.CreateUniqueName("e2e-favorite");
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await PickCategoryBySearchAsync(dialog, category);
+        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "☆ Als Favorit speichern" }).ClickAsync();
+
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "★ Favorit" })).ToBeVisibleAsync();
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = $"★{description}" })).ToBeVisibleAsync();
+        List<BookingTemplate> templates = await seeder.Services.GetRequiredService<IBookingTemplateManager>()
+            .GetAllBookingTemplatesAsync();
+        Assert.Contains(
+            templates,
+            template => (template.Description == description) && (template.CategoryId == category.Id));
     }
 
     [Fact]
@@ -81,7 +196,9 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Übernehmen" }).ClickAsync();
 
             await Expect(dialog).ToBeHiddenAsync();
-            await Expect(_page.Locator("tr", new PageLocatorOptions { HasText = keptItem.Name })).ToBeVisibleAsync();
+            ILocator keptRow = _page.Locator("tr", new PageLocatorOptions { HasText = keptItem.Name });
+            await Expect(keptRow).ToBeVisibleAsync();
+            await Expect(keptRow.Locator(".gwios-recurring-item-label")).ToHaveTextAsync(new Regex(Regex.Escape(keptItem.Name)));
             await Expect(_page.Locator("tr", new PageLocatorOptions { HasText = deselectedItem.Name })).ToHaveCountAsync(0);
         }
         finally
@@ -111,6 +228,103 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         {
             await CleanUpRecurringItemsAsync(seeder, item);
         }
+    }
+
+    [Fact]
+    public async Task AvailableBalanceCountsRecurringItemsAndBookedOtherBookingsButNotPendingOnes()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        await MarkCurrentMonthAsReviewedAsync(seeder);
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        decimal balanceBefore = await ReadAvailableBalanceAsync();
+
+        RecurringItem item = await CreateMonthlyRecurringItemAsync(seeder, category);
+        string bookedDescription = await CreateTodaysExpenseAsync(seeder, category, 20m, BookingStatus.Booked);
+        string pendingDescription = await CreateTodaysExpenseAsync(seeder, category, 300m, BookingStatus.Pending);
+
+        try
+        {
+            await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+
+            await Expect(AvailableBalanceValue()).ToHaveTextAsync(FormatSignedAmount(balanceBefore - item.Amount - 20m));
+        }
+        finally
+        {
+            await CleanUpBookingAsync(seeder, bookedDescription);
+            await CleanUpBookingAsync(seeder, pendingDescription);
+            await CleanUpRecurringItemsAsync(seeder, item);
+        }
+    }
+
+    private async Task<ILocator> OpenNewBookingDialogAsync()
+    {
+        await _page.GetByRole(AriaRole.Button, new() { Name = "+ Neue Buchung" }).ClickAsync();
+        // By name, because the category picker opens a second dialog inside this one.
+        ILocator dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Neue Buchung" });
+        await Expect(dialog).ToBeVisibleAsync();
+        return dialog;
+    }
+
+    // Filters by the full name, so that exactly the seeded category is left to click.
+    private static async Task PickCategoryBySearchAsync(ILocator dialog, Category category)
+    {
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Kategorie suchen" }).ClickAsync();
+        ILocator treeDialog = dialog.Page.GetByRole(AriaRole.Dialog, new() { Name = "Kategorie wählen" });
+        await Expect(treeDialog.GetByRole(AriaRole.Textbox, new() { Name = "Kategorien filtern" })).ToBeFocusedAsync();
+        await treeDialog.GetByRole(AriaRole.Textbox, new() { Name = "Kategorien filtern" }).FillAsync(category.Name);
+        await treeDialog.GetByRole(AriaRole.Button, new() { Name = category.Name, Exact = true }).ClickAsync();
+        await Expect(treeDialog).ToBeHiddenAsync();
+    }
+
+    // Exact, because "Speichern & weitere" would match as well.
+    private static async Task ClickSaveAsync(ILocator dialog)
+        => await dialog.Page.GetByRole(AriaRole.Button, new() { Name = "Speichern", Exact = true }).ClickAsync();
+
+    // The template is deleted together with the seeded category, so it needs no cleanup of its own.
+    private static async Task<BookingTemplate> CreateBookingTemplateAsync(TestDataSeeder seeder, Category category)
+        => await seeder.Services.GetRequiredService<IBookingTemplateManager>().CreateBookingTemplateAsync(
+            new BookingTemplate
+            {
+                Description = TestDataSeeder.CreateUniqueName("e2e-template"), CategoryId = category.Id
+            });
+
+    private ILocator AvailableBalanceValue()
+        => _page.Locator(".gwios-kpi-tile", new PageLocatorOptions { HasText = "Verfügbarer Saldo" })
+            .Locator(".gwios-kpi-tile-value");
+
+    private async Task<decimal> ReadAvailableBalanceAsync()
+    {
+        string text = await AvailableBalanceValue().InnerTextAsync();
+        decimal amount = decimal.Parse(
+            text.TrimStart('+', '–', ' '),
+            NumberStyles.Currency,
+            CultureInfo.GetCultureInfo("de-DE"));
+        return text.StartsWith('–') ? -amount : amount;
+    }
+
+    // Mirrors the formatting of the Dashboard page.
+    private static string FormatSignedAmount(decimal value)
+        => (value >= 0 ? "+ " : "– ") + Math.Abs(value).ToString("C", CultureInfo.GetCultureInfo("de-DE"));
+
+    private static async Task<string> CreateTodaysExpenseAsync(
+        TestDataSeeder seeder,
+        Category category,
+        decimal amount,
+        BookingStatus status)
+    {
+        IBookingManager bookingManager = seeder.Services.GetRequiredService<IBookingManager>();
+        string description = TestDataSeeder.CreateUniqueName("e2e-balance");
+        await bookingManager.CreateBookingAsync(new Booking
+        {
+            Date = DateOnly.FromDateTime(DateTime.Now),
+            Type = CategoryType.Expense,
+            CategoryId = category.Id,
+            Description = description,
+            Amount = amount,
+            Status = status
+        });
+        return description;
     }
 
     private async Task<ILocator> OpenFixBookingSelectionAsync()

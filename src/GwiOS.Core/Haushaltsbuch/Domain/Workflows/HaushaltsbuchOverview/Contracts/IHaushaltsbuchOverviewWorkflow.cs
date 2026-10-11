@@ -8,7 +8,7 @@ namespace GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contra
 public interface IHaushaltsbuchOverviewWorkflow
 {
     /// <summary>
-    /// Returns all categories and recurring items, together with the bookings between
+    /// Returns all categories, recurring items and booking templates, together with the bookings between
     /// <paramref name="fromDate"/> and <paramref name="toDate"/>, both inclusive.
     /// </summary>
     Task<HaushaltsbuchOverviewData> GetOverviewAsync(

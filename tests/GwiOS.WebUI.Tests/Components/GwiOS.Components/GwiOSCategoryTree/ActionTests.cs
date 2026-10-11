@@ -23,6 +23,16 @@ public sealed class ActionTests : BunitContext
     }
 
     [Fact]
+    public void ReportsTheCategoryToMarkAsFavorite_WhenItsStarIsClicked()
+    {
+        IRenderedComponent<GwiOSCategoryTreeUnderTest> tree = RenderCategoryTree();
+
+        GetRow(tree, "Strom").QuerySelector(".gwios-category-favorite")!.Click();
+
+        Assert.Equal(["favorite Strom"], _reports);
+    }
+
+    [Fact]
     public void ReportsTheParentOfANewSubCategory_WhenItsAddButtonIsClicked()
     {
         IRenderedComponent<GwiOSCategoryTreeUnderTest> tree = RenderCategoryTree();
@@ -64,6 +74,7 @@ public sealed class ActionTests : BunitContext
             .Add(component => component.Sums, new Dictionary<Guid, decimal>())
             .Add(component => component.CollapsedCategoryIds, new HashSet<Guid>())
             .Add(component => component.OnToggleCollapse, (Guid id) => _reports.Add($"toggle {id}"))
+            .Add(component => component.OnToggleFavorite, (Category category) => _reports.Add($"favorite {category.Name}"))
             .Add(component => component.OnAddChild, (Guid? id) => _reports.Add($"add {id}"))
             .Add(component => component.OnEdit, (Category category) => _reports.Add($"edit {category.Name}"))
             .Add(component => component.OnDelete, (Category category) => _reports.Add($"delete {category.Name}")));

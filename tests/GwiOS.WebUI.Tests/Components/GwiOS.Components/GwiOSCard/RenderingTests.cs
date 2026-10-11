@@ -74,6 +74,7 @@ public sealed class RenderingTests : BunitContext
     [InlineData(GwiOSCardAccent.Primary, "gwios-card-title--primary")]
     [InlineData(GwiOSCardAccent.Success, "gwios-card-title--success")]
     [InlineData(GwiOSCardAccent.Danger, "gwios-card-title--danger")]
+    [InlineData(GwiOSCardAccent.Warning, "gwios-card-title--warning")]
     public void ColorsTheTitleWithTheAccent(GwiOSCardAccent accent, string expectedClass)
     {
         IRenderedComponent<GwiOSCardUnderTest> card = Render<GwiOSCardUnderTest>(parameters => parameters

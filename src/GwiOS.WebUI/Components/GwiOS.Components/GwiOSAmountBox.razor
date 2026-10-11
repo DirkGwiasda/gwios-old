@@ -1,0 +1,40 @@
+<div class="gwios-amount-box">
+    <div class="gwios-amount-box-field @(ErrorMessage is not null ? "gwios-amount-box-field--invalid" : null)">
+        <span class="gwios-amount-box-sign @(Type == CategoryType.Income ? "gwios-amount-box-sign--income" : "gwios-amount-box-sign--expense")"
+              aria-hidden="true">
+            @(Type == CategoryType.Income ? "+" : "−")
+        </span>
+        <input id="@InputId"
+               type="text"
+               inputmode="decimal"
+               enterkeyhint="done"
+               autocomplete="off"
+               class="gwios-amount-box-input"
+               value="@Value"
+               placeholder="@Placeholder"
+               aria-label="Betrag"
+               aria-invalid="@(ErrorMessage is not null ? "true" : null)"
+               @ref="_inputElement"
+               @oninput="OnInputAsync"
+               @onkeydown="OnKeyDownAsync" />
+        <span class="gwios-amount-box-currency" aria-hidden="true">€</span>
+        <div class="gwios-amount-box-operators">
+            <button type="button" class="gwios-amount-box-operator" aria-label="Plus rechnen" @onclick="() => AppendOperatorAsync('+')">+</button>
+            <button type="button" class="gwios-amount-box-operator" aria-label="Minus rechnen" @onclick="() => AppendOperatorAsync('-')">−</button>
+        </div>
+    </div>
+    <div class="gwios-amount-box-footer">
+        @if (ErrorMessage is not null)
+        {
+            <span class="gwios-amount-box-error" role="alert">@ErrorMessage</span>
+        }
+        else if (_result.IsCalculation && (_result.Value is decimal value))
+        {
+            <span class="gwios-amount-box-result">= @AmountExpressionEvaluator.Format(value) €</span>
+        }
+        else
+        {
+            <span class="gwios-amount-box-hint">@Hint</span>
+        }
+    </div>
+</div>

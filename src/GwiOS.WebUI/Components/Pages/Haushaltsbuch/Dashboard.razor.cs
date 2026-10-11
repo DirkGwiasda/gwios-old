@@ -1,11 +1,17 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.AvailableBalance.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts.Models;
+using GwiOS.WebUI.AmountExpressions.Contracts;
 using GwiOS.WebUI.Components.GwiOS.Components;
 using GwiOS.WebUI.StatusMessages.Contracts;
 using GwiOS.WebUI.StatusMessages.Contracts.Models;
@@ -17,6 +23,9 @@ namespace GwiOS.WebUI.Components.Pages.Haushaltsbuch;
 /// Dashboard tab of the Haushaltsbuch: the KPI figures and bookings of the selected month, where bookings are
 /// created, changed in a dialog and deleted, and where due recurring items are picked in a dialog to become bookings —
 /// automatically on the first visit of an unreviewed month, or on demand through the "Fixbuchungen generieren" button.
+/// The booking dialog is built for quick entry: favorites fill in description and category, the amount comes first
+/// and may be a short calculation, the date is a tap away, several bookings can be entered in a row, and a new booking
+/// can be taken back from a bar shown after saving. Favorites are pinned and unpinned in the dialog and in the list.
 /// </summary>
 public partial class Dashboard
 {
@@ -26,32 +35,49 @@ public partial class Dashboard
         "Juli", "August", "September", "Oktober", "November", "Dezember"
     ];
     private static readonly CultureInfo GermanCulture = CultureInfo.GetCultureInfo("de-DE");
+    private static readonly TimeSpan UndoDuration = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan UndoneConfirmationDuration = TimeSpan.FromSeconds(2.5);
 
     private DateOnly _month;
     private List<Category> _categories = [];
+    private List<RecurringItem> _recurringItems = [];
     private List<Booking> _bookings = [];
+    private List<BookingTemplate> _bookingTemplates = [];
     private List<ProposedBooking> _proposedBookings = [];
+    private decimal _availableBalance;
 
     private bool _isProposalDialogOpen;
     private bool _isMonthReview;
     private readonly HashSet<ProposedBooking> _selectedProposals = [];
 
     private Booking? _editedBooking;
-    private DateOnly? _editDate;
+    private DateOnly _editDate;
     private CategoryType _editType;
     private Guid? _editCategoryId;
     private string _editDescription = string.Empty;
-    private decimal _editAmount;
+    private string _editAmountText = string.Empty;
     private BookingStatus _editStatus;
     private string? _amountError;
     private string? _categoryError;
+    private string? _favoriteError;
+    private string? _flashMessage;
+    private bool _isMoreOpen;
+    private int _amountFocusRequest;
     private bool _isSaving;
+
+    private UndoBarState? _undoBar;
 
     [Inject]
     private IBookingManager BookingManager { get; set; } = default!;
 
     [Inject]
+    private IBookingTemplateManager BookingTemplateManager { get; set; } = default!;
+
+    [Inject]
     private IHaushaltsbuchOverviewWorkflow OverviewWorkflow { get; set; } = default!;
+
+    [Inject]
+    private IAvailableBalanceWorkflow AvailableBalanceWorkflow { get; set; } = default!;
 
     [Inject]
     private IRecurringBookingGenerationWorkflow RecurringBookingGenerationWorkflow { get; set; } = default!;
@@ -60,7 +86,13 @@ public partial class Dashboard
     private IStatusMessageService StatusMessages { get; set; } = default!;
 
     [Inject]
+    private IAmountExpressionEvaluator AmountExpressionEvaluator { get; set; } = default!;
+
+    [Inject]
     private TimeProvider TimeProvider { get; set; } = default!;
+
+    private DateOnly Today
+        => DateOnly.FromDateTime(TimeProvider.GetLocalNow().DateTime);
 
     private DateOnly FirstDay
         => new(_month.Year, _month.Month, 1);
@@ -83,9 +115,6 @@ public partial class Dashboard
     private decimal ExpensePending
         => SumBookings(CategoryType.Expense, BookingStatus.Pending);
 
-    private decimal Balance
-        => (IncomeBooked + IncomePending) - (ExpenseBooked + ExpensePending);
-
     private decimal BookedBalance
         => IncomeBooked - ExpenseBooked;
 
@@ -94,6 +123,16 @@ public partial class Dashboard
 
     private string DialogTitle
         => IsNewBooking ? "Neue Buchung" : "Buchung bearbeiten";
+
+    private string MoreLabel
+        => $"{(_isMoreOpen ? "▾ Weniger" : "▸ Mehr")} · {(_editStatus == BookingStatus.Booked ? "Gebucht" : "Ausstehend")}";
+
+    // The favorite matching the description and category in the form, so picking it or typing the same marks it.
+    private Guid? ActiveTemplateId
+        => _editCategoryId is Guid categoryId ? FindBookingTemplate(_editDescription, categoryId)?.Id : null;
+
+    private bool IsFormFavorite
+        => ActiveTemplateId is not null;
 
     private string GenerateFixBookingsLabel
         => _proposedBookings.Count == 0
@@ -105,8 +144,7 @@ public partial class Dashboard
 
     protected override async Task OnInitializedAsync()
     {
-        DateOnly today = DateOnly.FromDateTime(TimeProvider.GetLocalNow().DateTime);
-        _month = new DateOnly(today.Year, today.Month, 1);
+        _month = new DateOnly(Today.Year, Today.Month, 1);
         await LoadAsync();
     }
 
@@ -119,11 +157,12 @@ public partial class Dashboard
     private decimal SumBookings(CategoryType type, BookingStatus status)
         => _bookings.Where(booking => (booking.Type == type) && (booking.Status == status)).Sum(booking => booking.Amount);
 
-    // A booking generated from a recurring item without a description of its own is labeled as such.
+    // A booking generated from a recurring item is labeled with that item instead, so it needs no dash.
+    private static bool HasDescriptionText(Booking booking)
+        => !string.IsNullOrWhiteSpace(booking.Description) || (booking.RecurringItemId is null);
+
     private static string GetDescription(Booking booking)
-        => !string.IsNullOrWhiteSpace(booking.Description)
-            ? booking.Description
-            : booking.RecurringItemId is null ? "—" : "Fixbuchung";
+        => string.IsNullOrWhiteSpace(booking.Description) ? "—" : booking.Description;
 
     private static string GetAmountClass(CategoryType type)
         => type == CategoryType.Income ? "gwios-amount gwios-amount--success" : "gwios-amount gwios-amount--danger";
@@ -136,21 +175,8 @@ public partial class Dashboard
 
     private void OpenNewBooking()
     {
-        DateOnly today = DateOnly.FromDateTime(TimeProvider.GetLocalNow().DateTime);
-        DateOnly defaultDate = (today >= FirstDay) && (today <= LastDay) ? today : FirstDay;
-        _editedBooking = new Booking
-        {
-            Date = defaultDate, Type = CategoryType.Expense, CategoryId = Guid.Empty, Amount = 0,
-            Status = BookingStatus.Booked
-        };
-        _editDate = defaultDate;
-        _editType = CategoryType.Expense;
-        _editCategoryId = null;
-        _editDescription = string.Empty;
-        _editAmount = 0;
-        _editStatus = BookingStatus.Booked;
-        _amountError = null;
-        _categoryError = null;
+        _flashMessage = null;
+        ResetFormForNewBooking(Today);
     }
 
     private void OpenEditBooking(Booking booking)
@@ -160,19 +186,63 @@ public partial class Dashboard
         _editType = booking.Type;
         _editCategoryId = booking.CategoryId;
         _editDescription = booking.Description ?? string.Empty;
-        _editAmount = booking.Amount;
+        _editAmountText = AmountExpressionEvaluator.Format(booking.Amount);
         _editStatus = booking.Status;
+        _isMoreOpen = false;
+        _flashMessage = null;
+        ClearFormErrors();
+    }
+
+    // Starts an empty form for the next booking; the date is kept, so a series of receipts from one day is quick.
+    private void ResetFormForNewBooking(DateOnly date)
+    {
+        _editedBooking = new Booking
+        {
+            Date = date, Type = CategoryType.Expense, CategoryId = Guid.Empty, Amount = 0,
+            Status = BookingStatus.Booked
+        };
+        _editDate = date;
+        _editType = CategoryType.Expense;
+        _editCategoryId = null;
+        _editDescription = string.Empty;
+        _editAmountText = string.Empty;
+        _editStatus = BookingStatus.Booked;
+        _isMoreOpen = false;
+        _amountFocusRequest++;
+        ClearFormErrors();
+    }
+
+    private void ClearFormErrors()
+    {
         _amountError = null;
         _categoryError = null;
+        _favoriteError = null;
     }
 
     private void CloseDialog()
         => _editedBooking = null;
 
-    private void SelectEditType(string item)
+    private void ApplyTemplate(BookingTemplate template)
     {
-        _editType = item == "Einnahme" ? CategoryType.Income : CategoryType.Expense;
-        _editCategoryId = null;
+        Category? category = _categories.FirstOrDefault(candidate => candidate.Id == template.CategoryId);
+        _editDescription = template.Description;
+        _editCategoryId = category?.Id;
+        _editType = category?.Type ?? _editType;
+        ClearFormErrors();
+        _amountFocusRequest++;
+    }
+
+    private void ChangeDescription(string description)
+    {
+        _editDescription = description;
+        _favoriteError = null;
+    }
+
+    private void SelectCategory(Guid? categoryId)
+    {
+        _editCategoryId = categoryId;
+        _categoryError = null;
+        _favoriteError = null;
     }
 
     private void SelectEditStatus(string item)
@@ -180,31 +250,12 @@ public partial class Dashboard
 
     private async Task SaveBookingAsync()
     {
-        if ((_editedBooking is null) || _isSaving)
-        {
-            return;
-        }
-
-        _amountError = _editAmount <= 0 ? "Bitte einen Betrag größer 0 angeben." : null;
-        _categoryError = _editCategoryId is null ? "Bitte eine Kategorie wählen." : null;
-        if ((_amountError is not null) || (_categoryError is not null) || (_editCategoryId is not Guid categoryId))
+        if (_isSaving || !TryCreateBookingFromForm(out Booking? booking))
         {
             return;
         }
 
         bool isNew = IsNewBooking;
-        Booking booking = new()
-        {
-            Id = _editedBooking.Id,
-            Date = _editDate ?? FirstDay,
-            Type = _editType,
-            CategoryId = categoryId,
-            Description = string.IsNullOrWhiteSpace(_editDescription) ? null : _editDescription.Trim(),
-            Amount = _editAmount,
-            Status = _editStatus,
-            RecurringItemId = _editedBooking.RecurringItemId
-        };
-
         _isSaving = true;
         try
         {
@@ -212,6 +263,7 @@ public partial class Dashboard
             {
                 await BookingManager.CreateBookingAsync(booking);
                 StatusMessages.Publish(StatusLevel.Neutral, $"Buchung über {FormatAmount(booking.Amount)} erfasst");
+                ShowUndoBar(booking);
             }
             else
             {
@@ -228,10 +280,133 @@ public partial class Dashboard
         await ReloadDataAsync();
     }
 
+    private async Task SaveBookingAndContinueAsync()
+    {
+        if (_isSaving || !IsNewBooking || !TryCreateBookingFromForm(out Booking? booking))
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            await BookingManager.CreateBookingAsync(booking);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+
+        StatusMessages.Publish(StatusLevel.Neutral, $"Buchung über {FormatAmount(booking.Amount)} erfasst");
+        _flashMessage = $"✓ {DescribeBooking(booking)} – bereit für die nächste";
+        ResetFormForNewBooking(booking.Date);
+        await ReloadDataAsync();
+    }
+
+    private bool TryCreateBookingFromForm([NotNullWhen(true)] out Booking? booking)
+    {
+        booking = null;
+        decimal? amount = AmountExpressionEvaluator.Evaluate(_editAmountText).Value;
+        _amountError = GetAmountError(amount);
+        _categoryError = _editCategoryId is null ? "Bitte eine Kategorie wählen." : null;
+        if ((_editedBooking is null) || (amount is not decimal validAmount) || (_amountError is not null)
+            || (_editCategoryId is not Guid categoryId))
+        {
+            return false;
+        }
+
+        booking = new Booking
+        {
+            Id = _editedBooking.Id,
+            Date = _editDate,
+            Type = _editType,
+            CategoryId = categoryId,
+            Description = string.IsNullOrWhiteSpace(_editDescription) ? null : _editDescription.Trim(),
+            Amount = validAmount,
+            Status = _editStatus,
+            RecurringItemId = _editedBooking.RecurringItemId
+        };
+        return true;
+    }
+
+    private string? GetAmountError(decimal? amount)
+        => (string.IsNullOrWhiteSpace(_editAmountText), amount) switch
+        {
+            (true, _) => "Bitte einen Betrag eingeben.",
+            (false, null) => "Bitte einen gültigen Betrag eingeben, z. B. 12,50 oder 12,50+3,20.",
+            (false, <= 0) => "Der Betrag muss größer als 0 sein.",
+            _ => null
+        };
+
+    // E.g. "Edeka · −47,83 € gebucht".
+    private string DescribeBooking(Booking booking)
+        => $"{booking.Description ?? "Buchung"} · {(booking.Type == CategoryType.Income ? "+" : "−")}"
+            + $"{AmountExpressionEvaluator.Format(booking.Amount)} € "
+            + (booking.Status == BookingStatus.Booked ? "gebucht" : "vorgemerkt");
+
+    private void ShowUndoBar(Booking booking)
+        => _undoBar = new UndoBarState(DescribeBooking(booking), booking.Id, UndoDuration);
+
+    private async Task UndoLastBookingAsync()
+    {
+        if (_undoBar?.BookingId is not Guid bookingId)
+        {
+            return;
+        }
+
+        await BookingManager.DeleteBookingAsync(bookingId);
+        _undoBar = new UndoBarState("Buchung zurückgenommen", null, UndoneConfirmationDuration);
+        StatusMessages.Publish(StatusLevel.Warning, "Buchung zurückgenommen");
+        await ReloadDataAsync();
+    }
+
     private async Task DeleteBookingAsync(Booking booking)
     {
         await BookingManager.DeleteBookingAsync(booking.Id);
         StatusMessages.Publish(StatusLevel.Warning, "Buchung gelöscht");
+        await ReloadDataAsync();
+    }
+
+    private BookingTemplate? FindBookingTemplate(string description, Guid categoryId)
+        => _bookingTemplates.FirstOrDefault(template =>
+            (template.CategoryId == categoryId)
+            && string.Equals(template.Description.Trim(), description.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private static bool CanBecomeFavorite(Booking booking)
+        => !string.IsNullOrWhiteSpace(booking.Description);
+
+    private bool IsFavorite(Booking booking)
+        => FindBookingTemplate(booking.Description ?? string.Empty, booking.CategoryId) is not null;
+
+    private async Task ToggleFavoriteFromFormAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_editDescription) || (_editCategoryId is not Guid categoryId))
+        {
+            _favoriteError = "Für einen Favoriten braucht es Beschreibung und Kategorie.";
+            return;
+        }
+
+        _favoriteError = null;
+        await ToggleFavoriteAsync(_editDescription.Trim(), categoryId);
+    }
+
+    private async Task ToggleFavoriteFromBookingAsync(Booking booking)
+        => await ToggleFavoriteAsync(booking.Description?.Trim() ?? string.Empty, booking.CategoryId);
+
+    private async Task ToggleFavoriteAsync(string description, Guid categoryId)
+    {
+        if (FindBookingTemplate(description, categoryId) is BookingTemplate existingTemplate)
+        {
+            await BookingTemplateManager.DeleteBookingTemplateAsync(existingTemplate.Id);
+            StatusMessages.Publish(StatusLevel.Neutral, $"Favorit „{description}“ entfernt");
+        }
+        else
+        {
+            await BookingTemplateManager.CreateBookingTemplateAsync(
+                new BookingTemplate { Description = description, CategoryId = categoryId });
+            StatusMessages.Publish(StatusLevel.Success, $"„{description}“ als Favorit gespeichert");
+        }
+
         await ReloadDataAsync();
     }
 
@@ -307,7 +482,24 @@ public partial class Dashboard
     {
         HaushaltsbuchOverviewData overview = await OverviewWorkflow.GetOverviewAsync(FirstDay, LastDay);
         _categories = overview.Categories;
+        _recurringItems = overview.RecurringItems;
         _bookings = overview.Bookings;
+        _bookingTemplates = overview.BookingTemplates;
+        _availableBalance = await AvailableBalanceWorkflow.GetAvailableBalanceAsync(_month);
         _proposedBookings = await RecurringBookingGenerationWorkflow.GetProposedBookingsAsync(_month);
+    }
+
+    // What the undo bar shows; a new instance restarts the bar with its own duration. BookingId is the booking that
+    // "Rückgängig" deletes, or null once it was taken back.
+    private sealed class UndoBarState(string text, Guid? bookingId, TimeSpan duration)
+    {
+        public string Text { get; } = text;
+
+        public Guid? BookingId { get; } = bookingId;
+
+        public bool CanUndo
+            => BookingId is not null;
+
+        public TimeSpan Duration { get; } = duration;
     }
 }

@@ -1,5 +1,8 @@
 using System.Globalization;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Exceptions;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Exceptions;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
@@ -13,8 +16,9 @@ using Microsoft.AspNetCore.Components;
 namespace GwiOS.WebUI.Components.Pages.Haushaltsbuch;
 
 /// <summary>
-/// Kategorien tab of the Haushaltsbuch: two trees (income and expense) where categories are created, changed in a
-/// dialog and deleted, each showing its booked sum for the current month.
+/// Kategorien tab of the Haushaltsbuch: the favorites (booking templates), which are reordered, renamed and deleted
+/// here, and two trees (income and expense) where categories are created, changed in a dialog, marked as favorite and
+/// deleted, each showing its booked sum for the current month.
 /// </summary>
 public partial class Kategorien
 {
@@ -23,6 +27,7 @@ public partial class Kategorien
     private static readonly CultureInfo GermanCulture = CultureInfo.GetCultureInfo("de-DE");
 
     private List<Category> _categories = [];
+    private List<BookingTemplate> _bookingTemplates = [];
     private Dictionary<Guid, decimal> _sums = [];
     private readonly HashSet<Guid> _collapsedCategoryIds = [];
 
@@ -39,6 +44,9 @@ public partial class Kategorien
 
     [Inject]
     private ICategoryDeletionWorkflow CategoryDeletionWorkflow { get; set; } = default!;
+
+    [Inject]
+    private IBookingTemplateManager BookingTemplateManager { get; set; } = default!;
 
     [Inject]
     private IHaushaltsbuchOverviewWorkflow OverviewWorkflow { get; set; } = default!;
@@ -124,7 +132,8 @@ public partial class Kategorien
             Name = _editName.Trim(),
             Type = _editType,
             ParentId = _editParentId,
-            Color = _editParentId is null ? _editColor : null
+            Color = _editParentId is null ? _editColor : null,
+            IsFavorite = _editedCategory.IsFavorite
         };
 
         _isSaving = true;
@@ -152,6 +161,58 @@ public partial class Kategorien
         }
 
         CloseDialog();
+        await LoadAsync();
+    }
+
+    private async Task ToggleFavoriteAsync(Category category)
+    {
+        Category changedCategory = new()
+        {
+            Id = category.Id,
+            Name = category.Name,
+            Type = category.Type,
+            ParentId = category.ParentId,
+            Color = category.Color,
+            IsFavorite = !category.IsFavorite
+        };
+
+        await CategoryManager.UpdateCategoryAsync(changedCategory);
+        StatusMessages.Publish(
+            changedCategory.IsFavorite ? StatusLevel.Success : StatusLevel.Neutral,
+            changedCategory.IsFavorite
+                ? $"Kategorie „{category.Name}“ als Favorit markiert"
+                : $"Kategorie „{category.Name}“ ist kein Favorit mehr");
+        await LoadAsync();
+    }
+
+    private async Task MoveBookingTemplateAsync(BookingTemplate template, BookingTemplateMoveDirection direction)
+    {
+        await BookingTemplateManager.MoveBookingTemplateAsync(template.Id, direction);
+        await LoadAsync();
+    }
+
+    private async Task RenameBookingTemplateAsync(BookingTemplate template)
+    {
+        try
+        {
+            await BookingTemplateManager.UpdateBookingTemplateAsync(template);
+        }
+        catch (BookingTemplateValidationException)
+        {
+            StatusMessages.Publish(
+                StatusLevel.Error,
+                $"Favorit „{template.Description}“ gibt es mit dieser Kategorie schon");
+            return;
+        }
+
+        StatusMessages.Publish(StatusLevel.Success, $"Favorit umbenannt in „{template.Description}“");
+        await LoadAsync();
+    }
+
+    private async Task DeleteBookingTemplateAsync(BookingTemplate template)
+    {
+        await BookingTemplateManager.DeleteBookingTemplateAsync(template.Id);
+        StatusMessages.Publish(StatusLevel.Warning, $"Favorit „{template.Description}“ gelöscht");
         await LoadAsync();
     }
 
@@ -187,6 +248,7 @@ public partial class Kategorien
         DateOnly lastDay = new(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
         HaushaltsbuchOverviewData overview = await OverviewWorkflow.GetOverviewAsync(firstDay, lastDay);
         _categories = overview.Categories;
+        _bookingTemplates = overview.BookingTemplates;
         _sums = ComputeSums(_categories, overview.Bookings);
     }
 

@@ -7,6 +7,8 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 /// Modal dialog in the GwiOS style: a panel with a title, content and optional action buttons above a dimmed page.
 /// It takes the keyboard focus when it opens and asks to be closed through the close button, a click on the dimmed
 /// page or Escape. On narrow screens it slides up from the bottom. The dialog is open as long as it is rendered.
+/// A dialog can open another one inside its content, e.g. a picker; keys pressed in the inner dialog do not reach the
+/// outer one, so Escape closes only the inner dialog.
 /// </summary>
 public partial class GwiOSDialog
 {

@@ -1,4 +1,5 @@
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Models;
 
@@ -25,4 +26,9 @@ public class HaushaltsbuchOverviewData
     /// Kategorien tabs, and a wider, selectable range for the Berichte tab.
     /// </summary>
     public required List<Booking> Bookings { get; set; }
+
+    /// <summary>
+    /// All stored booking templates (favorites), in the order they are offered in.
+    /// </summary>
+    public required List<BookingTemplate> BookingTemplates { get; set; }
 }

@@ -10,7 +10,9 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 /// </summary>
 public partial class GwiOSTextBox
 {
+    private ElementReference _inputElement;
     private bool _isTouched;
+    private int _handledFocusRequest;
 
     /// <summary>
     /// The current text. Never <c>null</c>; empty if nothing is entered.
@@ -79,6 +81,13 @@ public partial class GwiOSTextBox
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    /// <summary>
+    /// Counter to move the keyboard focus into the field: each increase focuses it once after the next render, and a
+    /// value above 0 on the first render focuses it right away.
+    /// </summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
     private bool IsInvalid
         => (ErrorMessage is not null) || IsMissingRequiredValue;
 
@@ -87,6 +96,18 @@ public partial class GwiOSTextBox
 
     private string? Tooltip
         => ErrorMessage ?? (IsMissingRequiredValue ? RequiredMessage : null);
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (FocusRequest == _handledFocusRequest)
+        {
+            return;
+        }
+
+        _handledFocusRequest = FocusRequest;
+        await _inputElement.FocusAsync();
+    }
 
     private async Task OnInputAsync(ChangeEventArgs eventArgs)
         => await UpdateValueAsync(eventArgs.Value?.ToString() ?? string.Empty);

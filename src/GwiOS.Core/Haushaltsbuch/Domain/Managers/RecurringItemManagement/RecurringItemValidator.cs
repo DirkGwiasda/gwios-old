@@ -64,6 +64,18 @@ internal sealed class RecurringItemValidator(ILogger<RecurringItemValidator> log
             validationErrors.Add($"The start month must be between {MinStartMonth} and {MaxStartMonth}.");
         }
 
+        if ((recurringItem.ValidFrom is DateOnly validFrom)
+            && (recurringItem.ValidUntil is DateOnly validUntil)
+            && (validUntil < validFrom))
+        {
+            validationErrors.Add("The end of the validity must not be before its start.");
+        }
+
+        if (recurringItem.PredecessorId == recurringItem.Id)
+        {
+            validationErrors.Add("The recurring item must not be its own predecessor.");
+        }
+
         return validationErrors;
     }
 

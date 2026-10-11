@@ -22,7 +22,8 @@ public interface IRecurringBookingGenerationWorkflow
 
     /// <summary>
     /// Creates a pending booking for each of the given proposed bookings and marks the month as reviewed, whether
-    /// or not any proposals were selected. <paramref name="month"/> may be any day of the month; only its year and
+    /// or not any proposals were selected. A created booking has no description of its own; it refers to its recurring
+    /// item instead, whose name is shown in its place. <paramref name="month"/> may be any day of the month; only its year and
     /// month are used.
     /// </summary>
     Task ConfirmAsync(

@@ -161,18 +161,71 @@ nichts umgesetzt.
       herausgelöst), `RecurringItemForecastWorkflow`, `GwiOSRecurringItemForecastMonth` (mobil kompakte Zeilen statt
       Karten), `RecurringItemForecastPdfRenderer`, `QuestPdfConfigurator`, Endpunkt. Tests: Core 668, WebUI 440, E2E 12
       grün (gegen Postgres-Container); PDF im arm64-Image unter Emulation erzeugt und geprüft.
+- [x] Kachel „Verfügbarer Saldo“ im Dashboard neu berechnet (Vorgabe von Dirk, 08.10.2026): Fixeinnahmen + gebuchte
+      andere Einnahmen − Fixkosten − gebuchte andere Ausgaben des gewählten Monats. Fixposten zählen nur aktiv, je
+      Fälligkeitstermin, ob gebucht oder nicht; „andere“ Buchungen = ohne `RecurringItemId` und mit Status „Gebucht“
+      (aus Fixposten erzeugte Buchungen würden sonst doppelt zählen). Neuer `AvailableBalanceWorkflow`; die Fußzeile
+      „Nur gebucht“ der Kachel bleibt unverändert. Tests: 11 neue Core-Unit-Tests grün, WebUI 440 grün, neuer E2E-Test
+      `AvailableBalanceCountsRecurringItemsAndBookedOtherBookingsButNotPendingOnes` — **E2E- und Integrationstests nicht
+      gelaufen** (Rechner `codingserver` ohne Postgres/Docker und `GwiOS.DB.TestConnectionstring`; .NET-SDK dort per
+      `dotnet-install.sh` nach `~/.dotnet` installiert, git fehlt).
+- [x] Herkunft einer Buchung aus einem Fixposten sichtbar (Vorgabe von Dirk, 08.10.2026): Die Referenz
+      `Booking.RecurringItemId` gab es schon (setzt nur die Generierung); neu zeigt das Dashboard sie an — in der
+      Tabelle neben der Beschreibung als „↻ <Name des Fixpostens>“, im Bearbeiten-Dialog schreibgeschützt als Feld
+      „Fixposten“. Setzen oder Ändern von Hand ist bewusst nicht möglich (Dirk: „nur anzeigen“); Generierung, Popup
+      und Button bleiben unverändert. Neue Komponente `GwiOSRecurringItemLabel` (bUnit-Tests); der Platzhalter
+      „Fixbuchung“ für generierte Buchungen ohne Beschreibung entfällt. WebUI 443 grün; der erweiterte E2E-Test
+      `GenerateFixBookingsTakesOverOnlyTheRecurringItemsLeftSelectedInTheDialog` ist **nicht gelaufen** (kein
+      Postgres auf `codingserver`).
+- [x] Generierte Buchungen bekommen keine Beschreibung mehr (Entscheidung von Dirk, 08.10.2026) — sonst stand der
+      Name des Fixpostens in der Tabelle doppelt („Miete ↻ Miete“). Bereits erzeugte Buchungen behalten ihre
+      Beschreibung (keine Datenmigration).
+- [x] Fixposten fortführen (Vorgabe von Dirk, 08.10.2026): Im Bearbeiten-Dialog unter „Status“ Feld „Fortführen ab“
+      (Datum, vorbelegt mit dem 1. des Folgemonats) und Button „Fortführen“. Der bisherige Posten endet am Vortag
+      und bleibt in der DB, ein neuer Posten mit den Werten aus dem Dialog gilt ab dem Datum. Modell nach Rückfrage
+      (Dirk): `RecurringItem.PredecessorId`, `ValidFrom`, `ValidUntil` statt nur des Aktiv-Schalters; beendete Posten
+      blendet die Fixkosten-Liste aus, kommender Start/Ende steht als „ab …“/„bis …“ unter dem Namen. Fortführen geht
+      nur bei Posten ohne Ende und mit einem Datum nach ihrem Start. Löschen eines Nachfolgers öffnet den Vorgänger
+      wieder (macht ein versehentliches Fortführen rückgängig). Fälligkeiten berücksichtigen die Gültigkeit im
+      `RecurringItemScheduler`, damit stimmen Vorschläge, Prognose und Saldo automatisch; die Monatssumme der
+      Fixkosten-Seite und der Soll-Wert in „Berichte“ zählen je Monat nur den am 1. gültigen Posten (sonst doppelt).
+      Neu: `ContinueRecurringItemAsync`, `IsValidOn`, `RecurringItemNotContinuableException`,
+      `IRecurringItemRepository.ContinueAsync` (Transaktion), Spalten per `ADD COLUMN IF NOT EXISTS`. Tests: Core-Unit
+      613 grün, WebUI 443 grün; 4 neue Repository-Integrationstests und der E2E-Test
+      `ContinuesARecurringItemWithAChangedAmountFromTheGivenDay` **nicht gelaufen** (kein Postgres auf `codingserver`).
+- [x] Rückwirkendes Anpassen von Buchungen beim Fortführen (Vorgabe von Dirk, 09.10.2026): Ein Fortführen passt
+      die aus dem Vorgänger erzeugten Buchungen (`RecurringItemId`) ab dem Stichtag an — Betrag, Kategorie, Typ und
+      Verweis auf den Nachfolger; Datum, Beschreibung und Status bleiben. Höchstens 12 Monate zurück einschließlich
+      des aktuellen Monats (am 09.10.2026 also ab 01.11.2025); ältere Buchungen bleiben, wie sie gebucht wurden.
+      Buchungen nach dem aktuellen Monat werden ebenfalls angepasst. Gebuchte wie ausstehende Buchungen werden
+      angepasst, manuelle ohne Verweis nicht. Neuer `RecurringItemContinuationWorkflow` (zwei Manager); die
+      Statusmeldung nennt die Zahl der angepassten Buchungen. Nicht atomar über beide Manager: Scheitert eine
+      Buchungsänderung, ist der Posten schon fortgeführt (Fehler im Log). Tests: Core-Unit 624 grün, WebUI 443 grün;
+      neuer E2E-Test `BackdatedContinuationAdjustsTheBookingsGeneratedFromTheRecurringItem` **nicht gelaufen**.
+- [x] Rückfrage bei geändertem Rhythmus (Vorgabe von Dirk, 09.10.2026): Liegen beim Fortführen anzupassende
+      Buchungen nicht auf einem Fälligkeitstag des Nachfolgers (Fälligkeitstag oder Turnus geändert), fragt ein Dialog
+      „Buchungen an neuen Rhythmus anpassen?“ mit der Liste (altes Datum → neues Datum bzw. „wird gelöscht“) und den
+      Knöpfen „Zurück“, „Datum belassen“, „Anpassen“. Ohne solche Buchungen gibt es keine Rückfrage. Zuordnung je
+      Monat: Buchung auf einem Fälligkeitstag behält ihn, die übrigen nehmen die freien Fälligkeitstage der Reihe nach,
+      überzählige werden gelöscht (z. B. wöchentlich → monatlich: drei von vier Buchungen). Nie vor den Stichtag.
+      Neu: `GetBookingReschedulingsAsync` (Vorschau), `BookingDateHandling`, `BookingRescheduling`, Zähler für
+      verschobene/gelöschte Buchungen in Ergebnis und Statusmeldung. Tests: Core-Unit 633 grün, WebUI 443 grün;
+      E2E-Test `AsksBeforeMovingBookingsToTheNewDueDayAndMovesThemWhenConfirmed` **nicht gelaufen**.
 - [x] Statt bUnit-Tests je Seite: echtes End-to-End-Testprojekt `tests/GwiOS.WebUI.E2E.Tests` mit Playwright
       gegen die real laufende WebUI (auf Wunsch von Dirk, 18.09.2026, als stärkerer Nachweis als Komponententests
       mit gerendertem Markup). Details siehe eigener Abschnitt unten.
 
 ### Entscheidungen
 
-- Datenmodell: `Category` (Name, Typ Einnahme/Ausgabe, ParentId, Farbe nur an Wurzeln), `Booking` (Datum, Typ,
+- Datenmodell: `Category` (Name, Typ Einnahme/Ausgabe, ParentId, Farbe nur an Wurzeln; seit 11.10.2026 Favorit),
+  `BookingTemplate` (seit 11.10.2026: Favorit aus Beschreibung, Kategorie und Position), `Booking` (Datum, Typ,
   Kategorie, Betrag, Beschreibung, Status gebucht/ausstehend, optionaler `RecurringItemId`-Verweis),
-  `RecurringItem` (Name, Typ, Kategorie, Betrag, Turnus, Fälligkeitstag, Startmonat, aktiv). `Booking.Type` wird
+  `RecurringItem` (Name, Typ, Kategorie, Betrag, Turnus, Fälligkeitstag, Startmonat, aktiv; seit 08.10.2026
+  zusätzlich `PredecessorId`, `ValidFrom`, `ValidUntil` für das Fortführen). `Booking.Type` wird
   redundant gespeichert statt aus der Kategorie abgeleitet, weil sich der Typ einer Kategorie nach dem Anlegen
   nicht mehr ändert und das jede Monatsaggregation einen Join spart.
-- Vier Manager (`CategoryManagement`, `BookingManagement`, `RecurringItemManagement`, `MonthReviewManagement`),
+- Vier Manager (`CategoryManagement`, `BookingManagement`, `RecurringItemManagement`, `MonthReviewManagement`;
+  seit 11.10.2026 dazu `BookingTemplateManagement`),
   drei Workflows (`RecurringBookingGenerationWorkflow`, `HaushaltsbuchOverviewWorkflow`, `CategoryDeletionWorkflow`);
   einzelne CRUD-Vorgänge laufen ohne Workflow direkt über den jeweiligen Manager (bestätigt von Dirk, 18.09.2026).
 - Eigenes Schema `haushaltsbuch` mit den Tabellen `categories`, `bookings`, `recurring_items`, dazu
@@ -181,7 +234,8 @@ nichts umgesetzt.
   (bestätigt von Dirk, 18.09.2026).
 - Familienweiter Zugriff ohne Rollen-/Personenbeschränkung, wie ToDos (bestätigt von Dirk, 18.09.2026).
 - Kein Kontostand-Übertrag zwischen Monaten; Saldo = Einnahmen minus Ausgaben des gewählten Monats (bestätigt von
-  Dirk, 18.09.2026).
+  Dirk, 18.09.2026). Der „Verfügbare Saldo“ im Dashboard rechnet seit 08.10.2026 mit Fixposten statt
+  allen Buchungen (siehe oben, `AvailableBalanceWorkflow`).
 - Statt eines reinen Buttons zeigt die Dashboard-Seite beim ersten Besuch eines ungeprüften Monats automatisch ein
   Popup mit den fälligen Fixposten zum Abhaken; erst eine Bestätigung markiert den Monat als geprüft. Der Button
   „Fixbuchungen generieren“ bleibt zusätzlich als manueller Weg bestehen (Vorgabe von Dirk, 18.09.2026).
@@ -212,6 +266,68 @@ nichts umgesetzt.
   Monatsverlauf über die ganze Zeile eine dritte, leere Spalte); Tabellen scrollen waagerecht, statt rechts
   abgeschnitten zu werden (Vorlage bei ca. 820–1000 px); der Monatsumschalter bleibt mobil eine Zeile (Vorlage stapelt
   ‹, Monat und › untereinander); Spaltenbeschriftungen der mobilen Tabellenkarten immer normal statt teils fett.
+
+### Komfortable Buchungseingabe (Konzept 10.10.2026, Favoriten + Eingabemaske umgesetzt 11.10.2026)
+
+Ziel: alltägliche, wiederkehrende Buchungen, die keine Fixposten sind (Einkauf, Tanken, Bäcker), schnell erfassen,
+vor allem am Handy. Konzept von Claude, mit Dirk abgestimmt (10.10.2026); Designvorlage
+`docs/UI/HaBu Schnellbuchung Zustände.html` (Claude Design, gebündelt — die eigentliche Oberfläche steckt als
+verschachteltes Bundle „Vorschlag2“ darin und lässt sich nur durch Entpacken des gzip/base64-Manifests lesen).
+
+- Favoriten (Vorlagen) sind familienweit, ohne Personenbezug (es gibt keine Rollen).
+- Ein Favorit bucht nie mit einem Tipp, er füllt immer das Formular: Beschreibung, Kategorie und Typ sind fest,
+  Betrag und Datum nicht (Beispiel Dirk: „Edeka“ → Lebensmittel, Betrag und Datum wechseln; das Datum weicht beim
+  nachträglichen Buchen ab). Favoriten speichern deshalb keinen Betrag; nach der Auswahl steht der Cursor im Betrag.
+- Datum: „Heute“ vorbelegt, aber gut sichtbar mit Chips „Heute · Gestern · Vorgestern · 📅“ statt hinter „Mehr“.
+- Vorgabe von Dirk (11.10.2026), Abweichung von der Vorlage: Oben im Dialog stehen die Favoriten-**Buchungstexte**
+  (Beschreibung + Kategorie, auf Rückfrage bestätigt), unten bei der Kategorie die **Favoriten-Kategorien** statt
+  „zuletzt benutzt“. Kategorien werden im Tab „Kategorien“ per ☆/★ im Baum als Favorit markiert/entmarkiert
+  (`Category.IsFavorite`, Spalte `is_favorite` per `ADD COLUMN IF NOT EXISTS`). Die Favoritenliste wird in einer
+  eigenen Karte oben im Tab „Kategorien“ gepflegt (↑ ↓ statt Drag & Drop, ✎ inline umbenennen, ✕ mit zweitem Klick).
+- [x] Phase 1 Eingabemaske + Phase 3 Favoriten (11.10.2026, Umfang von Dirk gewählt: „Favoriten + Eingabemaske“):
+      `BookingTemplateManagement` (Tabelle `haushaltsbuch.booking_templates`, beim Löschen der Kategorie per
+      `ON DELETE CASCADE` mitgelöscht, Reihenfolge über `position`), Favoriten im `HaushaltsbuchOverviewWorkflow`.
+      Neue Komponenten `GwiOSAmountBox` (Betrag zuerst, `inputmode="decimal"`, Vorzeichen nach Typ, + / −, Ergebnis
+      „= 15,70 €“), `GwiOSDateChips`, `GwiOSCategoryPicker` (Favoriten-Chips, Suche über den vollen Pfad, Baum als
+      Ausnahme, Typ-Umschalter — Suche und Baum inzwischen durch das Popup ersetzt, siehe unten), `GwiOSBookingTemplateChips`, `GwiOSBookingTemplateList`, `GwiOSUndoBar`; Dienst
+      `IAmountExpressionEvaluator` (WebUI) für Rechnen im Betrag; zentrale Klassen `gwios-chip`, `gwios-chip-row`,
+      `gwios-link-button`, `gwios-icon-button--favorite(-active)`; `GwiOSCardAccent.Warning`. Dashboard-Dialog:
+      Favoriten oben (nur bei neuer Buchung), Betrag, Beschreibung, Kategorie, Datum, „▸ Mehr · Status“,
+      „☆ Als Favorit speichern“, „Speichern & weitere“ (Datum bleibt, kurze Bestätigung im Dialog), nach „Speichern“
+      Rückgängig-Leiste (6 s) über der Statusleiste; ☆/★ auch je Buchung in der Liste. Bearbeiten zeigt keine
+      Favoriten-Chips, aber den Fixposten-Hinweis. Tests: Core-Unit 677 grün, WebUI 532 grün; die neuen
+      Repository-Integrationstests (`BookingTemplatePostgresRepository`, `is_favorite`) und die neuen/angepassten
+      E2E-Tests (Dashboard: Favorit, Favoriten-Kategorie, Rückgängig, „Speichern & weitere“, Stern im Dialog;
+      Kategorien: Favorit markieren, Favorit umbenennen/löschen) **nicht gelaufen** (kein Postgres/Docker auf
+      `codingserver`). Die Oberfläche wurde nicht im Browser angesehen (keine DB/Keycloak hier).
+- [x] Kategorieauswahl als Popup (11.10.2026, Vorgabe von Dirk): Statt Suchfeld und aufklappbarem Baum im Dialog
+      öffnet der Button „🔍 Kategorie suchen“ einen zweiten `GwiOSDialog` „Kategorie wählen“ mit dem Baum beider
+      Typen; Klick wählt und schließt. Darüber ein Filterfeld (fokussiert): Groß-/Kleinschreibung egal, Treffer nur
+      am **Anfang** des Kategorienamens („a“ → Auto, Allgemein; „au“ → nur Auto). Der Baum zeigt nur die Treffer;
+      deren übergeordnete Kategorien bleiben zur Orientierung sichtbar, sind aber nicht wählbar (Vorschlag von
+      Claude); ein Typ ohne Treffer wird ausgeblendet. Dafür: `GwiOSTextBox.FocusRequest`; `GwiOSDialog` lässt
+      Tasten nicht mehr an einen äußeren Dialog durch (Escape schließt nur den inneren) und zentriert ohne
+      `transform` (sonst wäre der innere Dialog im äußeren gefangen). WebUI-Tests 542 grün; E2E-Hilfsmethode
+      angepasst, nicht gelaufen; nicht im Browser angesehen.
+- [ ] Phase 2 Autovervollständigung über die Beschreibung (`IBookingManager.GetBookingSuggestionsAsync`) mit
+      „Häufig“-Chips und dem letzten Betrag als grauem Platzhalter — in der Vorlage enthalten, bewusst nicht umgesetzt.
+- [ ] Phase 4 PWA/Handy: App-Shortcuts, Direktlink `/haushaltsbuch/buchen`, Plus-Knopf (FAB) und Liste statt Tabelle
+      im Dashboard am Handy, Hinweis bei Verbindungsabbruch („Eingabe bleibt“) — in der Vorlage enthalten, nicht
+      umgesetzt.
+
+#### Entscheidungen (11.10.2026, Vorschläge von Claude — noch nicht von Dirk gegengeprüft)
+
+- Die Favoriten-Chips oben markieren den Favoriten, dessen Beschreibung und Kategorie gerade im Formular stehen —
+  egal ob gewählt oder getippt; ebenso zeigt der Stern unten ★, sobald die Kombination ein Favorit ist.
+- Favoriten-Kategorien beider Typen stehen als Chips da, Ausgaben zuerst; die Wahl einer Einnahme-Kategorie stellt
+  den Typ auf Einnahme. Ohne markierte Kategorie erscheint ein Hinweis auf ☆ im Tab „Kategorien“.
+- Neue Buchungen bekommen immer „Heute“ als Datum, auch wenn im Dashboard ein anderer Monat gewählt ist (bisher: der
+  1. des gewählten Monats). Die Datums-Chips beziehen sich auf heute.
+- Rechnen im Betrag: nur + und −, Komma als Dezimaltrenner (mit Komma gelten Punkte als Tausender), ohne Komma ein
+  Punkt als Dezimaltrenner („42.50“). Ungültige Eingaben melden „Bitte einen gültigen Betrag eingeben …“.
+- Rückgängig löscht die eben angelegte Buchung (nur nach „Speichern“, nicht nach „Speichern & weitere“).
+- Doppelte Favoriten (gleiche Beschreibung, gleiche Kategorie, ohne Groß-/Kleinschreibung) verhindert der Validator;
+  dieselbe Beschreibung mit anderer Kategorie ist erlaubt.
 
 ### Testinfrastruktur: lokale Postgres-DB und Playwright-E2E-Tests
 

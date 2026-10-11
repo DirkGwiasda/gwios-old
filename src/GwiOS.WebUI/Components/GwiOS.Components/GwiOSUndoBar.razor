@@ -1,0 +1,10 @@
+<div class="gwios-undo-bar" role="status">
+    <div class="gwios-undo-bar-panel">
+        <span class="gwios-undo-bar-dot @(CanUndo ? "gwios-undo-bar-dot--active" : null)"></span>
+        <span class="gwios-undo-bar-text">@Text</span>
+        @if (CanUndo)
+        {
+            <button type="button" class="gwios-link-button gwios-undo-bar-action" @onclick="OnUndo">Rückgängig</button>
+        }
+    </div>
+</div>

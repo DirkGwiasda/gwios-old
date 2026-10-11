@@ -1,0 +1,23 @@
+<div class="gwios-chip-row" role="group" aria-label="@AriaLabel">
+    @foreach ((string label, int daysAgo) in RelativeDays)
+    {
+        DateOnly date = Today.AddDays(-daysAgo);
+        <button type="button"
+                class="gwios-chip @(Value == date ? "gwios-chip--selected" : null)"
+                aria-pressed="@(Value == date ? "true" : "false")"
+                @onclick="() => SelectAsync(date)">
+            @label
+        </button>
+    }
+    <span class="gwios-date-chips-custom">
+        <span class="gwios-chip @(IsCustomDate ? "gwios-chip--selected" : null)" aria-hidden="true">
+            @(IsCustomDate ? $"📅 {Value:dd.MM.yyyy}" : "📅")
+        </span>
+        <input type="date"
+               class="gwios-date-chips-picker"
+               value="@Value.ToString("yyyy-MM-dd")"
+               aria-label="Anderes Datum wählen"
+               title="Anderes Datum"
+               @onchange="OnPickerChangeAsync" />
+    </span>
+</div>

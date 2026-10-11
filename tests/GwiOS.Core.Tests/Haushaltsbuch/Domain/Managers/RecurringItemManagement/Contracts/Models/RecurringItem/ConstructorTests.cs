@@ -36,6 +36,16 @@ public sealed class ConstructorTests
         Assert.True(recurringItem.Active);
     }
 
+    [Fact]
+    public void DefaultsToNoPredecessorAndAnUnboundedValidity()
+    {
+        RecurringItemUnderTest recurringItem = CreateRecurringItem();
+
+        Assert.Null(recurringItem.PredecessorId);
+        Assert.Null(recurringItem.ValidFrom);
+        Assert.Null(recurringItem.ValidUntil);
+    }
+
     private static RecurringItemUnderTest CreateRecurringItem()
         => new()
         {

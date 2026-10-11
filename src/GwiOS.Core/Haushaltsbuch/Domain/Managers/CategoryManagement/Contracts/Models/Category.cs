@@ -34,4 +34,10 @@ public class Category
     /// root category instead.
     /// </summary>
     public string? Color { get; set; }
+
+    /// <summary>
+    /// Whether the category is offered as a favorite when a booking is entered, so it can be picked with a single
+    /// tap. Any category can be a favorite, regardless of its type or level. <c>false</c> by default.
+    /// </summary>
+    public bool IsFavorite { get; set; }
 }

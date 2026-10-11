@@ -26,6 +26,16 @@ public interface IRecurringItemRepository
     Task UpdateAsync(RecurringItem recurringItem, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Overwrites the stored predecessor with <paramref name="endedPredecessor"/> and stores the new
+    /// <paramref name="successor"/>, in one transaction: either both changes are stored or none. Throws a
+    /// <see cref="RecurringItemNotFoundException"/> if the predecessor is not stored.
+    /// </summary>
+    Task ContinueAsync(
+        RecurringItem endedPredecessor,
+        RecurringItem successor,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns all stored recurring items, ordered by type and then by name. The list is empty if no recurring
     /// items are stored.
     /// </summary>

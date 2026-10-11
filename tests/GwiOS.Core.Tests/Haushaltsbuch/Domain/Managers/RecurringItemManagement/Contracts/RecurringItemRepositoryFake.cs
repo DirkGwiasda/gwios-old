@@ -33,6 +33,21 @@ public sealed class RecurringItemRepositoryFake : IRecurringItemRepository
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// How many times <see cref="ContinueAsync"/> was called.
+    /// </summary>
+    public int ContinueCallCount { get; private set; }
+
+    public async Task ContinueAsync(
+        RecurringItem endedPredecessor,
+        RecurringItem successor,
+        CancellationToken cancellationToken = default)
+    {
+        ContinueCallCount++;
+        await UpdateAsync(endedPredecessor, cancellationToken);
+        await InsertAsync(successor, cancellationToken);
+    }
+
     public Task<List<RecurringItem>> GetAllAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(_recurringItems.OrderBy(item => item.Type).ThenBy(item => item.Name).ToList());
 

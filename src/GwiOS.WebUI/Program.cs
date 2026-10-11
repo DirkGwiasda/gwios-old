@@ -2,11 +2,14 @@ using GwiOS.Core;
 using GwiOS.Core.CrossCutting.Logging.Contracts;
 using GwiOS.Core.CrossCutting.Persons.Domain.Managers.PersonManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.MonthReviewManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
 using GwiOS.Core.Satellites.Domain.Managers.SatelliteManagement.Contracts;
 using GwiOS.Core.ToDos.Domain.Managers.ToDoManagement.Contracts;
+using GwiOS.WebUI.AmountExpressions;
+using GwiOS.WebUI.AmountExpressions.Contracts;
 using GwiOS.WebUI.Api.Backup;
 using GwiOS.WebUI.Api.Backup.Contracts;
 using GwiOS.WebUI.Api.Haushaltsbuch;
@@ -50,6 +53,7 @@ public class Program
         builder.Services.AddGwiOSCore(GetGwiOSConnectionString(builder.Configuration));
         // Scoped, so every circuit and thus every user session has status messages of its own.
         builder.Services.AddScoped<IStatusMessageService, StatusMessageService>();
+        builder.Services.AddSingleton<IAmountExpressionEvaluator, AmountExpressionEvaluator>();
         builder.Services.AddScoped<ISatellitePingEndpoint, SatellitePingEndpoint>();
         builder.Services.AddScoped<IDatabaseBackupEndpoint, DatabaseBackupEndpoint>();
         builder.Services.AddScoped<IRecurringItemForecastPdfEndpoint, RecurringItemForecastPdfEndpoint>();
@@ -189,5 +193,8 @@ public class Program
         IMonthReviewRepository monthReviewRepository =
             scope.ServiceProvider.GetRequiredService<IMonthReviewRepository>();
         await monthReviewRepository.EnsureStorageCreatedAsync();
+        IBookingTemplateRepository bookingTemplateRepository =
+            scope.ServiceProvider.GetRequiredService<IBookingTemplateRepository>();
+        await bookingTemplateRepository.EnsureStorageCreatedAsync();
     }
 }

@@ -1,6 +1,7 @@
 using System.Globalization;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts.Models;
@@ -39,6 +40,9 @@ public partial class Berichte
 
     [Inject]
     private IRecurringItemForecastWorkflow ForecastWorkflow { get; set; } = default!;
+
+    [Inject]
+    private IRecurringItemManager RecurringItemManager { get; set; } = default!;
 
     [Inject]
     private TimeProvider TimeProvider { get; set; } = default!;
@@ -110,16 +114,16 @@ public partial class Berichte
 
     private List<SollIstRow> ComputeSollIstRows()
     {
-        int rangeMonths = RangeMonthStarts.Count;
+        List<DateOnly> monthStarts = RangeMonthStarts;
         List<Category> expenseRoots =
             [.. _categories.Where(category => (category.ParentId is null) && (category.Type == CategoryType.Expense))];
         List<(string Label, decimal Plan, decimal Actual)> raw = [];
         foreach (Category root in expenseRoots)
         {
             HashSet<Guid> descendantIds = CollectWithDescendants(root.Id);
-            decimal plan = _recurringItems
-                .Where(item => item.Active && (item.Type == CategoryType.Expense) && descendantIds.Contains(item.CategoryId))
-                .Sum(GetMonthlyEquivalent) * rangeMonths;
+            List<RecurringItem> rootItems = [.. _recurringItems
+                .Where(item => item.Active && (item.Type == CategoryType.Expense) && descendantIds.Contains(item.CategoryId))];
+            decimal plan = monthStarts.Sum(monthStart => SumMonthlyEquivalentsValidOn(rootItems, monthStart));
             decimal actual = _rangeBookings
                 .Where(booking => (booking.Type == CategoryType.Expense) && descendantIds.Contains(booking.CategoryId))
                 .Sum(booking => booking.Amount);
@@ -183,6 +187,10 @@ public partial class Berichte
             new GwiOSLineSeries("Ausgaben", "#ff4d6d", expense)
         ];
     }
+
+    // A continued item and its successor never count for the same month: only the one in effect on the 1st counts.
+    private decimal SumMonthlyEquivalentsValidOn(List<RecurringItem> items, DateOnly monthStart)
+        => items.Where(item => RecurringItemManager.IsValidOn(item, monthStart)).Sum(GetMonthlyEquivalent);
 
     private static decimal GetMonthlyEquivalent(RecurringItem item)
         => item.Interval switch

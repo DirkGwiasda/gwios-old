@@ -1,0 +1,106 @@
+<div class="gwios-category-picker">
+    <div class="gwios-category-picker-header">
+        <span class="gwios-form-field-label">Kategorie</span>
+        <div class="gwios-category-picker-types" role="group" aria-label="Typ" title="Ergibt sich aus der Kategorie">
+            <button type="button"
+                    class="gwios-category-picker-type @(Type == CategoryType.Expense ? "gwios-category-picker-type--expense" : null)"
+                    aria-pressed="@(Type == CategoryType.Expense ? "true" : "false")"
+                    @onclick="() => SelectTypeAsync(CategoryType.Expense)">
+                Ausgabe
+            </button>
+            <button type="button"
+                    class="gwios-category-picker-type @(Type == CategoryType.Income ? "gwios-category-picker-type--income" : null)"
+                    aria-pressed="@(Type == CategoryType.Income ? "true" : "false")"
+                    @onclick="() => SelectTypeAsync(CategoryType.Income)">
+                Einnahme
+            </button>
+        </div>
+    </div>
+
+    @if (FavoriteCategories.Count > 0)
+    {
+        <div class="gwios-chip-row" role="group" aria-label="Favoriten-Kategorien">
+            @foreach (Category category in FavoriteCategories)
+            {
+                <button type="button"
+                        class="gwios-chip @(category.Id == SelectedCategoryId ? "gwios-chip--selected" : null)"
+                        title="@BuildPath(category.Id)"
+                        aria-pressed="@(category.Id == SelectedCategoryId ? "true" : "false")"
+                        @onclick="() => SelectCategoryAsync(category)">
+                    <span class="gwios-chip-dot" style="background-color: @ResolveColor(category.Id);"></span>
+                    @category.Name
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="gwios-category-picker-note">
+            Häufige Kategorien lassen sich im Tab „Kategorien“ mit ☆ als Favorit markieren und erscheinen dann hier.
+        </p>
+    }
+
+    @if (SelectedCategoryId is Guid selectedCategoryId)
+    {
+        <span class="gwios-category-picker-selected">
+            <GwiOSCategoryLabel Categories="Categories" CategoryId="selectedCategoryId" />
+        </span>
+    }
+
+    <button type="button"
+            class="gwios-button gwios-button--secondary gwios-category-picker-open"
+            aria-haspopup="dialog"
+            @onclick="OpenTree">
+        🔍 Kategorie suchen
+    </button>
+
+    @if (ErrorMessage is not null)
+    {
+        <span class="gwios-category-picker-error" role="alert">@ErrorMessage</span>
+    }
+</div>
+
+@if (_isTreeOpen)
+{
+    <GwiOSDialog Title="Kategorie wählen" OnClose="CloseTree">
+        <GwiOSTextBox Value="@_filterText"
+                      ValueChanged="OnFilterChanged"
+                      Placeholder="Filtern, z. B. „au“ …"
+                      AriaLabel="Kategorien filtern"
+                      FocusRequest="1"
+                      autocomplete="off"
+                      enterkeyhint="search" />
+
+        <div class="gwios-category-picker-tree-area">
+            @if (VisibleTreeColumns.Count > 0)
+            {
+                <div class="gwios-category-picker-tree">
+                    @foreach ((CategoryType type, string title, List<(Category Category, int Depth)> items) in VisibleTreeColumns)
+                    {
+                        <div class="gwios-category-picker-tree-column">
+                            <span class="gwios-category-picker-tree-title gwios-category-picker-tree-title--@type.ToString().ToLowerInvariant()">@title</span>
+                            @foreach ((Category category, int depth) in items)
+                            {
+                                bool isSelectable = MatchesFilter(category);
+                                <button type="button"
+                                        class="gwios-category-picker-tree-item @(depth == 0 ? "gwios-category-picker-tree-item--root" : null) @(category.Id == SelectedCategoryId ? "gwios-category-picker-tree-item--selected" : null)"
+                                        style="padding-left: @(10 + (depth * 18))px;"
+                                        disabled="@(!isSelectable)"
+                                        @onclick="() => SelectCategoryAsync(category)">
+                                    <span class="gwios-chip-dot" style="background-color: @ResolveColor(category.Id);"></span>
+                                    @category.Name
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="gwios-category-picker-none">
+                    @(FilterPrefix.Length > 0 ? $"Keine Kategorie beginnt mit „{FilterPrefix}“." : "Es gibt noch keine Kategorien.")
+                </p>
+            }
+        </div>
+    </GwiOSDialog>
+}

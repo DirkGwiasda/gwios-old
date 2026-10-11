@@ -18,5 +18,10 @@ public enum GwiOSCardAccent
     /// <summary>
     /// Red, for negative content such as expenses.
     /// </summary>
-    Danger = 2
+    Danger = 2,
+
+    /// <summary>
+    /// Yellow, for favorites, matching their star.
+    /// </summary>
+    Warning = 3
 }

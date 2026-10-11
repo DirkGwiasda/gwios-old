@@ -32,7 +32,13 @@
                     @foreach (RecurringItem item in FilteredItems)
                     {
                         <tr @key="item.Id">
-                            <td data-label="Name" class="gwios-fixkosten-name">@item.Name</td>
+                            <td data-label="Name" class="gwios-fixkosten-name">
+                                @item.Name
+                                @if (GetValidityHint(item) is string validityHint)
+                                {
+                                    <span class="gwios-fixkosten-validity">@validityHint</span>
+                                }
+                            </td>
                             <td data-label="Kategorie" class="gwios-fixkosten-muted">
                                 <GwiOSCategoryLabel Categories="_categories" CategoryId="item.CategoryId" />
                             </td>
@@ -73,7 +79,7 @@
     </div>
 </div>
 
-@if (_editedItem is not null)
+@if ((_editedItem is not null) && (_pendingReschedulings is null))
 {
     <GwiOSDialog Title="@DialogTitle" CanClose="!_isSaving" OnClose="CloseDialog">
         <ChildContent>
@@ -139,6 +145,24 @@
                                 AriaLabel="Status"
                                 Variant="GwiOSPillGroupVariant.Toggles" />
             </div>
+            @if (CanContinue)
+            {
+                <GwiOSFormField Label="Fortführen ab" InputId="fix-edit-continue-date" ErrorMessage="@_continueError">
+                    <div class="gwios-fixkosten-continue">
+                        <GwiOSDateBox id="fix-edit-continue-date"
+                                      Value="_continueDate"
+                                      ValueChanged="date => { _continueDate = date; _continueError = null; }"
+                                      AriaLabel="Fortführen ab" />
+                        <button type="button"
+                                class="gwios-button gwios-button--secondary"
+                                disabled="@_isSaving"
+                                title="Bisherigen Posten am Vortag beenden und mit den geänderten Werten ab diesem Datum fortführen; daraus erzeugte Buchungen ab diesem Datum (höchstens 12 Monate zurück) werden angepasst"
+                                @onclick="ContinueItemAsync">
+                            Fortführen
+                        </button>
+                    </div>
+                </GwiOSFormField>
+            }
         </ChildContent>
         <Actions>
             <button type="button" class="gwios-button gwios-button--secondary" disabled="@_isSaving" @onclick="CloseDialog">
@@ -146,6 +170,44 @@
             </button>
             <button type="button" class="gwios-button" disabled="@_isSaving" @onclick="SaveItemAsync">
                 @(_isSaving ? "Speichert …" : "Speichern")
+            </button>
+        </Actions>
+    </GwiOSDialog>
+}
+
+@if (_pendingReschedulings is not null)
+{
+    <GwiOSDialog Title="Buchungen an neuen Rhythmus anpassen?" CanClose="!_isSaving" OnClose="CancelRescheduling">
+        <ChildContent>
+            <p class="gwios-dialog-intro">
+                Diese Buchungen liegen nicht auf einem Fälligkeitstag des geänderten Postens. Sollen sie verschoben bzw.
+                gelöscht werden? Betrag und Kategorie werden in jedem Fall angepasst.
+            </p>
+            <ul class="gwios-fixkosten-reschedulings">
+                @foreach (BookingRescheduling rescheduling in _pendingReschedulings)
+                {
+                    <li @key="rescheduling.Booking.Id">
+                        <span class="gwios-fixkosten-rescheduling-date">@rescheduling.Booking.Date.ToString("dd.MM.yyyy")</span>
+                        <span class="@(rescheduling.NewDate is null ? "gwios-amount--danger" : "")">@FormatReschedulingTarget(rescheduling)</span>
+                    </li>
+                }
+            </ul>
+        </ChildContent>
+        <Actions>
+            <button type="button" class="gwios-button gwios-button--secondary" disabled="@_isSaving" @onclick="CancelRescheduling">
+                Zurück
+            </button>
+            <button type="button"
+                    class="gwios-button gwios-button--secondary"
+                    disabled="@_isSaving"
+                    @onclick="() => ConfirmReschedulingAsync(BookingDateHandling.KeepDates)">
+                Datum belassen
+            </button>
+            <button type="button"
+                    class="gwios-button"
+                    disabled="@_isSaving"
+                    @onclick="() => ConfirmReschedulingAsync(BookingDateHandling.FollowSchedule)">
+                Anpassen
             </button>
         </Actions>
     </GwiOSDialog>

@@ -4,7 +4,7 @@ namespace GwiOS.WebUI.Tests.Components.GwiOS.Components.GwiOSCategoryTree;
 
 /// <summary>
 /// A small category tree for the tests of <c>GwiOSCategoryTree</c>: two root categories, one of them with two
-/// sub-categories.
+/// sub-categories, of which "Miete" is a favorite.
 /// </summary>
 internal sealed class GwiOSCategoryTreeProbe
 {
@@ -18,7 +18,7 @@ internal sealed class GwiOSCategoryTreeProbe
 
     public GwiOSCategoryTreeProbe()
     {
-        Rent = new Category { Name = "Miete", Type = CategoryType.Expense, ParentId = Living.Id };
+        Rent = new Category { Name = "Miete", Type = CategoryType.Expense, ParentId = Living.Id, IsFavorite = true };
         Electricity = new Category { Name = "Strom", Type = CategoryType.Expense, ParentId = Living.Id };
     }
 

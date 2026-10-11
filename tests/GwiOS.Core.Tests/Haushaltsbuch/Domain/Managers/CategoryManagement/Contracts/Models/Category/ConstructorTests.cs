@@ -33,4 +33,12 @@ public sealed class ConstructorTests
         Assert.Null(category.ParentId);
         Assert.Null(category.Color);
     }
+
+    [Fact]
+    public void IsNoFavorite()
+    {
+        CategoryUnderTest category = new() { Name = "Wohnen", Type = CategoryType.Expense };
+
+        Assert.False(category.IsFavorite);
+    }
 }

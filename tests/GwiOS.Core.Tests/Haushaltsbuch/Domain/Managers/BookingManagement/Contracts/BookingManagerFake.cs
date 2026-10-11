@@ -17,6 +17,11 @@ public sealed class BookingManagerFake : IBookingManager
     public List<Booking> CreatedBookings { get; } = [];
 
     /// <summary>
+    /// The IDs of all bookings deleted so far, in call order.
+    /// </summary>
+    public List<Guid> DeletedBookingIds { get; } = [];
+
+    /// <summary>
     /// Stores a booking directly, as if it had been created before the test.
     /// </summary>
     public void Add(Booking booking)
@@ -48,6 +53,7 @@ public sealed class BookingManagerFake : IBookingManager
 
     public Task DeleteBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
+        DeletedBookingIds.Add(bookingId);
         _bookings.RemoveAll(booking => booking.Id == bookingId);
         return Task.CompletedTask;
     }

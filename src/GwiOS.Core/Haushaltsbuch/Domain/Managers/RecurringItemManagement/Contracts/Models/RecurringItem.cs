@@ -54,4 +54,22 @@ public class RecurringItem
     /// Whether the item is active. An inactive item is not proposed as a booking. Defaults to <c>true</c>.
     /// </summary>
     public bool Active { get; set; } = true;
+
+    /// <summary>
+    /// The ID of the recurring item this one continues with changed values from <see cref="ValidFrom"/> on (e.g. the
+    /// same insurance after a price increase), or <c>null</c> if it continues none. Becomes <c>null</c> when the
+    /// predecessor is deleted.
+    /// </summary>
+    public Guid? PredecessorId { get; set; }
+
+    /// <summary>
+    /// The first day the item is in effect, or <c>null</c> if it has no start. Due dates before it do not count.
+    /// </summary>
+    public DateOnly? ValidFrom { get; set; }
+
+    /// <summary>
+    /// The last day the item is in effect, or <c>null</c> if it has no end. Due dates after it do not count; an item
+    /// that has been continued by a successor ends on the day before the successor's <see cref="ValidFrom"/>.
+    /// </summary>
+    public DateOnly? ValidUntil { get; set; }
 }

@@ -1,4 +1,5 @@
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Exceptions;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Models;
 using ProductionRecurringItemScheduler = GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.RecurringItemScheduler;
 
@@ -6,7 +7,9 @@ namespace GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.RecurringItemManagement
 
 /// <summary>
 /// Stands in for <see cref="IRecurringItemManager"/> for the workflow tests. It keeps recurring items in memory and
-/// does not validate. Due dates come from the real <c>RecurringItemScheduler</c>, so the workflow tests see
+/// does not validate; a continuation ends the predecessor and stores the successor without further checks, but throws a
+/// <c>RecurringItemNotFoundException</c> for an unknown predecessor. Due dates
+/// and validity come from the real <c>RecurringItemScheduler</c>, so the workflow tests see
 /// the same schedule as production.
 /// </summary>
 public sealed class RecurringItemManagerFake : IRecurringItemManager
@@ -35,6 +38,21 @@ public sealed class RecurringItemManagerFake : IRecurringItemManager
         return Task.CompletedTask;
     }
 
+    public Task<RecurringItem> ContinueRecurringItemAsync(
+        Guid predecessorId,
+        DateOnly effectiveDate,
+        RecurringItem successor,
+        CancellationToken cancellationToken = default)
+    {
+        RecurringItem predecessor = _recurringItems.SingleOrDefault(item => item.Id == predecessorId)
+            ?? throw new RecurringItemNotFoundException(predecessorId);
+        predecessor.ValidUntil = effectiveDate.AddDays(-1);
+        successor.PredecessorId = predecessorId;
+        successor.ValidFrom = effectiveDate;
+        _recurringItems.Add(successor);
+        return Task.FromResult(successor);
+    }
+
     public Task<List<RecurringItem>> GetAllRecurringItemsAsync(CancellationToken cancellationToken = default)
         => Task.FromResult(_recurringItems.OrderBy(item => item.Type).ThenBy(item => item.Name).ToList());
 
@@ -46,4 +64,7 @@ public sealed class RecurringItemManagerFake : IRecurringItemManager
 
     public IReadOnlyList<DateOnly> GetDueDates(RecurringItem recurringItem, DateOnly month)
         => _recurringItemScheduler.GetDueDates(recurringItem, month);
+
+    public bool IsValidOn(RecurringItem recurringItem, DateOnly date)
+        => _recurringItemScheduler.IsValidOn(recurringItem, date);
 }

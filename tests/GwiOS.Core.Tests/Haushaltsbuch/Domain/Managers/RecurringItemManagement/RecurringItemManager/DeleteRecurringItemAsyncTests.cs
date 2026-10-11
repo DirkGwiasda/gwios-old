@@ -46,6 +46,31 @@ public sealed class DeleteRecurringItemAsyncTests
     }
 
     [Fact]
+    public async Task ReopensThePredecessor_WhenTheDeletedItemContinuedIt()
+    {
+        RecurringItem successor = await StoreContinuationAsync(predecessorValidUntil: new DateOnly(2026, 10, 31));
+
+        await _probe.RecurringItemManager.DeleteRecurringItemAsync(successor.Id, TestContext.Current.CancellationToken);
+
+        RecurringItem predecessor = Assert.Single(
+            await _probe.RecurringItemRepository.GetAllAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(_miete.Id, predecessor.Id);
+        Assert.Null(predecessor.ValidUntil);
+    }
+
+    [Fact]
+    public async Task LeavesThePredecessorEnded_WhenItEndsOnAnotherDayThanTheDayBeforeTheDeletedItemStarts()
+    {
+        RecurringItem successor = await StoreContinuationAsync(predecessorValidUntil: new DateOnly(2026, 9, 30));
+
+        await _probe.RecurringItemManager.DeleteRecurringItemAsync(successor.Id, TestContext.Current.CancellationToken);
+
+        RecurringItem predecessor = Assert.Single(
+            await _probe.RecurringItemRepository.GetAllAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(new DateOnly(2026, 9, 30), predecessor.ValidUntil);
+    }
+
+    [Fact]
     public async Task LogsTheDeletionWithTheRecurringItemId()
     {
         await _probe.RecurringItemRepository.InsertAsync(_miete, TestContext.Current.CancellationToken);
@@ -56,5 +81,18 @@ public sealed class DeleteRecurringItemAsyncTests
         Assert.Equal(LogLevel.Information, logEntry.LogLevel);
         Assert.Equal("Recurring item deleted.", logEntry.Message);
         Assert.Equal(_miete.Id.ToString(), logEntry.ContextData["RecurringItemId"]);
+    }
+
+    private async Task<RecurringItem> StoreContinuationAsync(DateOnly predecessorValidUntil)
+    {
+        _miete.ValidUntil = predecessorValidUntil;
+        RecurringItem successor = new()
+        {
+            Name = "Miete", Type = CategoryType.Expense, CategoryId = _miete.CategoryId, Amount = 1190m,
+            Interval = RecurringInterval.Monthly, PredecessorId = _miete.Id, ValidFrom = new DateOnly(2026, 11, 1)
+        };
+        await _probe.RecurringItemRepository.InsertAsync(_miete, TestContext.Current.CancellationToken);
+        await _probe.RecurringItemRepository.InsertAsync(successor, TestContext.Current.CancellationToken);
+        return successor;
     }
 }

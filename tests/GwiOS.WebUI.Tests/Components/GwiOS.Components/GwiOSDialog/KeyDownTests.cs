@@ -39,6 +39,23 @@ public sealed class KeyDownTests : BunitContext
         Assert.Equal(0, _closeCount);
     }
 
+    [Fact]
+    public void ClosesOnlyTheInnerDialog_WhenEscapeIsPressedInADialogInsideAnother()
+    {
+        int innerCloseCount = 0;
+        IRenderedComponent<GwiOSDialogUnderTest> dialog = Render<GwiOSDialogUnderTest>(parameters => parameters
+            .Add(component => component.Title, "Buchung")
+            .Add(component => component.OnClose, () => _closeCount++)
+            .AddChildContent<GwiOSDialogUnderTest>(inner => inner
+                .Add(component => component.Title, "Kategorie wählen")
+                .Add(component => component.OnClose, () => innerCloseCount++)));
+
+        dialog.FindAll("[role='dialog']")[1].KeyDown("Escape");
+
+        Assert.Equal(1, innerCloseCount);
+        Assert.Equal(0, _closeCount);
+    }
+
     private IRenderedComponent<GwiOSDialogUnderTest> RenderDialog(bool canClose)
         => Render<GwiOSDialogUnderTest>(parameters => parameters
             .Add(component => component.Title, "Person bearbeiten")

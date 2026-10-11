@@ -297,6 +297,78 @@ h1:focus {
     color: var(--gwios-primary);
 }
 
+/* Schaltfläche, die wie ein Link aussieht, z.B. "Alle Kategorien ▾" oder "Rückgängig". */
+.gwios-link-button {
+    padding: 4px 0;
+    border: none;
+    background: none;
+    color: var(--gwios-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gwios-link-button:hover {
+    color: var(--gwios-primary-hover);
+}
+
+/* Antippbare Auswahl in Pillenform, z.B. Favoriten, Kategorien oder ein Datum in der Buchungseingabe. Groß genug
+   für den Finger (40 px hoch). */
+.gwios-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid var(--gwios-border);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--gwios-text-muted);
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.gwios-chip:hover {
+    color: var(--gwios-text);
+}
+
+.gwios-chip.gwios-chip--selected {
+    border-color: rgba(0, 170, 255, 0.7);
+    background: rgba(0, 136, 255, 0.18);
+    color: var(--gwios-text);
+    box-shadow: 0 0 12px rgba(0, 136, 255, 0.25);
+}
+
+/* Favoriten leuchten gelb wie ihr Stern. */
+.gwios-chip.gwios-chip--favorite {
+    border-color: rgba(255, 208, 86, 0.4);
+    background: rgba(255, 208, 86, 0.06);
+    color: var(--gwios-warning);
+}
+
+.gwios-chip.gwios-chip--favorite.gwios-chip--selected {
+    border-color: var(--gwios-warning);
+    background: rgba(255, 208, 86, 0.2);
+    box-shadow: 0 0 14px rgba(255, 208, 86, 0.35);
+}
+
+.gwios-chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.gwios-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
 /* Kleine quadratische Schaltfläche mit Symbol, z.B. in Kacheln. */
 .gwios-icon-button {
     display: inline-flex;
@@ -324,6 +396,18 @@ h1:focus {
 .gwios-icon-button.gwios-icon-button--primary:hover {
     border-color: rgba(0, 136, 255, 0.55);
     color: var(--gwios-primary);
+}
+
+/* Stern zum Markieren als Favorit: ☆ gedämpft, ★ gelb. */
+.gwios-icon-button.gwios-icon-button--favorite:hover {
+    border-color: rgba(255, 208, 86, 0.5);
+    color: var(--gwios-warning);
+}
+
+.gwios-icon-button.gwios-icon-button--favorite-active {
+    border-color: rgba(255, 208, 86, 0.5);
+    background: rgba(255, 208, 86, 0.1);
+    color: var(--gwios-warning);
 }
 
 .gwios-icon-button.gwios-icon-button--success {

@@ -1,0 +1,76 @@
+@if (Templates.Count == 0)
+{
+    <p class="gwios-empty">
+        Noch keine Favoriten. Im Buchungsdialog oder in der Buchungsliste auf ☆ tippen, um Edeka, Bäcker &amp; Co.
+        anzuheften.
+    </p>
+}
+
+@for (int index = 0; index < Templates.Count; index++)
+{
+    BookingTemplate template = Templates[index];
+    bool isFirst = index == 0;
+    bool isLast = index == Templates.Count - 1;
+    <div class="gwios-booking-template-row" @key="template.Id">
+        <span class="gwios-booking-template-star" aria-hidden="true">★</span>
+        @if (template.Id == _renamingTemplateId)
+        {
+            <input type="text"
+                   class="gwios-input gwios-booking-template-rename"
+                   value="@_renameText"
+                   maxlength="200"
+                   aria-label="Neuer Name"
+                   @ref="_renameInput"
+                   @oninput="eventArgs => _renameText = eventArgs.Value?.ToString() ?? string.Empty"
+                   @onkeydown="OnRenameKeyDownAsync" />
+            <div class="gwios-booking-template-actions">
+                <button type="button" class="gwios-button gwios-button--compact" @onclick="SaveRenameAsync">Speichern</button>
+                <button type="button" class="gwios-button gwios-button--compact gwios-button--secondary" @onclick="CancelRename">
+                    Abbrechen
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="gwios-booking-template-text">
+                <span class="gwios-booking-template-name">@template.Description</span>
+                <span class="gwios-booking-template-category">
+                    <GwiOSCategoryLabel Categories="Categories" CategoryId="template.CategoryId" />
+                </span>
+            </div>
+            <div class="gwios-booking-template-actions">
+                <button type="button"
+                        class="gwios-icon-button gwios-icon-button--primary"
+                        title="Nach oben"
+                        aria-label="Nach oben"
+                        disabled="@isFirst"
+                        @onclick="() => OnMoveUp.InvokeAsync(template)">
+                    ↑
+                </button>
+                <button type="button"
+                        class="gwios-icon-button gwios-icon-button--primary"
+                        title="Nach unten"
+                        aria-label="Nach unten"
+                        disabled="@isLast"
+                        @onclick="() => OnMoveDown.InvokeAsync(template)">
+                    ↓
+                </button>
+                <button type="button"
+                        class="gwios-icon-button gwios-icon-button--primary"
+                        title="Umbenennen"
+                        aria-label="Umbenennen"
+                        @onclick="() => StartRename(template)">
+                    ✎
+                </button>
+                <GwiOSConfirmButton Title="Löschen"
+                                    ConfirmText="Sicher?"
+                                    ConfirmTitle="Zum Bestätigen erneut klicken"
+                                    CssClass="gwios-icon-button"
+                                    ConfirmCssClass="gwios-icon-button gwios-icon-button--danger"
+                                    OnConfirmed="() => OnDelete.InvokeAsync(template)">
+                    ✕
+                </GwiOSConfirmButton>
+            </div>
+        }
+    </div>
+}

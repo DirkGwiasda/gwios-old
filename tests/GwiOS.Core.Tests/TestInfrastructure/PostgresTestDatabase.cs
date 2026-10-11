@@ -2,6 +2,7 @@ using GwiOS.Core.CrossCutting.Logging.Contracts;
 using GwiOS.Core.CrossCutting.Persons.Domain.Managers.PersonManagement.Contracts;
 using GwiOS.Core.CrossCutting.Persons.Infrastructure;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.MonthReviewManagement.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
@@ -53,6 +54,9 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
         BookingRepositoryLogger = (LoggerFake<BookingPostgresRepository>)_serviceProvider
             .GetRequiredService<ILogger<BookingPostgresRepository>>();
         MonthReviewRepository = _scope.ServiceProvider.GetRequiredService<IMonthReviewRepository>();
+        BookingTemplateRepository = _scope.ServiceProvider.GetRequiredService<IBookingTemplateRepository>();
+        BookingTemplateRepositoryLogger = (LoggerFake<BookingTemplatePostgresRepository>)_serviceProvider
+            .GetRequiredService<ILogger<BookingTemplatePostgresRepository>>();
     }
 
     /// <summary>
@@ -131,6 +135,17 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
     /// </summary>
     public IMonthReviewRepository MonthReviewRepository { get; }
 
+    /// <summary>
+    /// The booking template repository under test, connected to the test database.
+    /// </summary>
+    public IBookingTemplateRepository BookingTemplateRepository { get; }
+
+    /// <summary>
+    /// The logger of the booking template repository. It keeps the entries of all tests sharing this fixture, so
+    /// tests only look at the entries of the booking templates they created themselves.
+    /// </summary>
+    internal LoggerFake<BookingTemplatePostgresRepository> BookingTemplateRepositoryLogger { get; }
+
     public async ValueTask InitializeAsync()
     {
         await LogEntryRepository.EnsureStorageCreatedAsync();
@@ -141,6 +156,7 @@ public sealed class PostgresTestDatabase : IAsyncLifetime
         await RecurringItemRepository.EnsureStorageCreatedAsync();
         await BookingRepository.EnsureStorageCreatedAsync();
         await MonthReviewRepository.EnsureStorageCreatedAsync();
+        await BookingTemplateRepository.EnsureStorageCreatedAsync();
     }
 
     public async ValueTask DisposeAsync()

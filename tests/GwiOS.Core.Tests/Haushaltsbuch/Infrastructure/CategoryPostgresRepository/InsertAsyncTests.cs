@@ -26,6 +26,18 @@ public sealed class InsertAsyncTests(PostgresTestDatabase database) : IAsyncLife
         Assert.Equal(category.Type, storedCategory.Type);
         Assert.Null(storedCategory.ParentId);
         Assert.Equal(category.Color, storedCategory.Color);
+        Assert.False(storedCategory.IsFavorite);
+    }
+
+    [Fact]
+    public async Task StoresAFavoriteCategoryAsFavorite()
+    {
+        Category category = _testCategories.Create();
+        category.IsFavorite = true;
+
+        await _categoryRepository.InsertAsync(category, TestContext.Current.CancellationToken);
+
+        Assert.True((await _testCategories.FindStoredAsync(category.Id))?.IsFavorite);
     }
 
     [Fact]

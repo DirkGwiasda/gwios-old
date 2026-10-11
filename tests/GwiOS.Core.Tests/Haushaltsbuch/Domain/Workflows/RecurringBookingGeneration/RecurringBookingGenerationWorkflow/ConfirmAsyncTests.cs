@@ -29,7 +29,7 @@ public sealed class ConfirmAsyncTests
         Assert.Equal(_proposed.Date, created.Date);
         Assert.Equal(_proposed.Type, created.Type);
         Assert.Equal(_proposed.CategoryId, created.CategoryId);
-        Assert.Equal(_proposed.Name, created.Description);
+        Assert.Null(created.Description);
         Assert.Equal(_proposed.Amount, created.Amount);
         Assert.Equal(BookingStatus.Pending, created.Status);
         Assert.Equal(_proposed.RecurringItemId, created.RecurringItemId);

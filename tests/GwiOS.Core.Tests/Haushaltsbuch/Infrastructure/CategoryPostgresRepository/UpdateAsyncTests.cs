@@ -26,7 +26,8 @@ public sealed class UpdateAsyncTests(PostgresTestDatabase database) : IAsyncLife
             Id = category.Id,
             Name = _testCategories.CreateUniqueName(),
             Type = category.Type,
-            Color = "#3399ff"
+            Color = "#3399ff",
+            IsFavorite = true
         };
 
         await _categoryRepository.UpdateAsync(changedCategory, TestContext.Current.CancellationToken);
@@ -35,6 +36,7 @@ public sealed class UpdateAsyncTests(PostgresTestDatabase database) : IAsyncLife
         Assert.NotNull(storedCategory);
         Assert.Equal(changedCategory.Name, storedCategory.Name);
         Assert.Equal(changedCategory.Color, storedCategory.Color);
+        Assert.True(storedCategory.IsFavorite);
     }
 
     [Fact]

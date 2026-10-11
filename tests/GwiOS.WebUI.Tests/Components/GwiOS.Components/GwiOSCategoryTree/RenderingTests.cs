@@ -73,6 +73,18 @@ public sealed class RenderingTests : BunitContext
         Assert.False(toggles[1].HasAttribute("disabled"));
     }
 
+    [Fact]
+    public void ShowsAFilledStarForFavoritesAndAnEmptyOneForTheOtherCategories()
+    {
+        IRenderedComponent<GwiOSCategoryTreeUnderTest> tree = RenderCategoryTree(collapsedCategoryIds: []);
+
+        IReadOnlyList<IElement> stars = tree.FindAll(".gwios-category-favorite");
+        Assert.Equal(["☆", "☆", "★", "☆"], stars.Select(star => star.TextContent.Trim()));
+        Assert.Equal("Favorit entfernen", stars[2].GetAttribute("title"));
+        Assert.Equal("true", stars[2].GetAttribute("aria-pressed"));
+        Assert.Equal("Als Favorit markieren", stars[0].GetAttribute("title"));
+    }
+
     private IRenderedComponent<GwiOSCategoryTreeUnderTest> RenderCategoryTree(HashSet<Guid> collapsedCategoryIds)
         => Render<GwiOSCategoryTreeUnderTest>(parameters => parameters
             .Add(component => component.Categories, _probe.All)

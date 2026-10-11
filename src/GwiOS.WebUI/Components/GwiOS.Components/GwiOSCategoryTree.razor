@@ -16,6 +16,13 @@
         <span class="gwios-category-sum">@FormatSum(category)</span>
         <div class="gwios-category-actions">
             <button type="button"
+                    class="gwios-icon-button @(category.IsFavorite ? "gwios-icon-button--favorite-active" : "gwios-icon-button--favorite") gwios-category-favorite"
+                    title="@(category.IsFavorite ? "Favorit entfernen" : "Als Favorit markieren")"
+                    aria-pressed="@(category.IsFavorite ? "true" : "false")"
+                    @onclick="() => OnToggleFavorite.InvokeAsync(category)">
+                @(category.IsFavorite ? "★" : "☆")
+            </button>
+            <button type="button"
                     class="gwios-icon-button gwios-icon-button--primary gwios-category-add"
                     title="Unterkategorie anlegen"
                     @onclick="() => OnAddChild.InvokeAsync(category.Id)">
@@ -43,6 +50,7 @@
                            Sums="Sums"
                            CollapsedCategoryIds="CollapsedCategoryIds"
                            OnToggleCollapse="OnToggleCollapse"
+                           OnToggleFavorite="OnToggleFavorite"
                            OnAddChild="OnAddChild"
                            OnEdit="OnEdit"
                            OnDelete="OnDelete"

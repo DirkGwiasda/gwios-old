@@ -1,0 +1,15 @@
+/* Das unsichtbare Datumsfeld liegt über dem Kalender-Chip, damit ein Tipp darauf direkt den Kalender öffnet. */
+.gwios-date-chips-custom {
+    position: relative;
+    display: flex;
+}
+
+.gwios-date-chips-picker {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    color-scheme: dark;
+}

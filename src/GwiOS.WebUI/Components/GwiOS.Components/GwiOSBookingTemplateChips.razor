@@ -1,0 +1,41 @@
+@if (Templates.Count == 0)
+{
+    <p class="gwios-booking-template-chips-empty">
+        Noch keine Favoriten. Mit ☆ lassen sich Beschreibung und Kategorie einer Buchung anheften – z. B. Edeka,
+        Bäcker &amp; Co.
+    </p>
+}
+else
+{
+    <div class="gwios-chip-row" role="group" aria-label="Favoriten">
+        @foreach (BookingTemplate template in Templates)
+        {
+            <button type="button"
+                    class="gwios-chip gwios-chip--favorite @(template.Id == ActiveTemplateId ? "gwios-chip--selected" : null)"
+                    aria-pressed="@(template.Id == ActiveTemplateId ? "true" : "false")"
+                    @onclick="() => OnSelect.InvokeAsync(template)">
+                <span aria-hidden="true">★</span>@template.Description
+            </button>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>
+    /// The booking templates (favorites) to offer, in the order they are shown.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public IReadOnlyList<BookingTemplate> Templates { get; set; } = [];
+
+    /// <summary>
+    /// The ID of the template the form was last filled from, shown as selected; or <c>null</c> for none.
+    /// </summary>
+    [Parameter]
+    public Guid? ActiveTemplateId { get; set; }
+
+    /// <summary>
+    /// Raised with the template the user picks.
+    /// </summary>
+    [Parameter]
+    public EventCallback<BookingTemplate> OnSelect { get; set; }
+}

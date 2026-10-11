@@ -33,9 +33,9 @@
                           FooterRight="@(ExpensePending > 0 ? $"+ {FormatAmount(ExpensePending)} offen" : "nichts offen")"
                           FooterRightAccent="@(ExpensePending > 0 ? GwiOSKpiAccent.Warning : GwiOSKpiAccent.Muted)" />
             <GwiOSKpiTile Label="Verfügbarer Saldo"
-                          Value="@FormatSignedAmount(Balance)"
-                          Accent="@(Balance >= 0 ? GwiOSKpiAccent.Primary : GwiOSKpiAccent.Danger)"
-                          ValueAccent="@(Balance >= 0 ? GwiOSKpiAccent.Success : GwiOSKpiAccent.Danger)"
+                          Value="@FormatSignedAmount(_availableBalance)"
+                          Accent="@(_availableBalance >= 0 ? GwiOSKpiAccent.Primary : GwiOSKpiAccent.Danger)"
+                          ValueAccent="@(_availableBalance >= 0 ? GwiOSKpiAccent.Success : GwiOSKpiAccent.Danger)"
                           FooterLeft="Nur gebucht"
                           FooterRight="@FormatAmount(BookedBalance)"
                           FooterRightAccent="@(BookedBalance >= 0 ? GwiOSKpiAccent.Success : GwiOSKpiAccent.Danger)" />
@@ -67,7 +67,16 @@
                             <td data-label="Kategorie">
                                 <GwiOSCategoryLabel Categories="_categories" CategoryId="booking.CategoryId" />
                             </td>
-                            <td data-label="Beschreibung" class="gwios-dashboard-description">@GetDescription(booking)</td>
+                            <td data-label="Beschreibung" class="gwios-dashboard-description">
+                                <div class="gwios-dashboard-description-content">
+                                    @if (HasDescriptionText(booking))
+                                    {
+                                        <span>@GetDescription(booking)</span>
+                                    }
+                                    <GwiOSRecurringItemLabel RecurringItems="_recurringItems"
+                                                             RecurringItemId="booking.RecurringItemId" />
+                                </div>
+                            </td>
                             <td data-label="Betrag" class="gwios-table-end @GetAmountClass(booking.Type)">
                                 @FormatSignedAmount(booking.Type == CategoryType.Income ? booking.Amount : -booking.Amount)
                             </td>
@@ -78,6 +87,17 @@
                             </td>
                             <td data-label="Aktionen" class="gwios-table-end">
                                 <div class="gwios-table-actions">
+                                    @if (CanBecomeFavorite(booking))
+                                    {
+                                        bool isFavorite = IsFavorite(booking);
+                                        <button type="button"
+                                                class="gwios-icon-button @(isFavorite ? "gwios-icon-button--favorite-active" : "gwios-icon-button--favorite")"
+                                                title="@(isFavorite ? "Favorit entfernen" : "Als Favorit")"
+                                                aria-pressed="@(isFavorite ? "true" : "false")"
+                                                @onclick="() => ToggleFavoriteFromBookingAsync(booking)">
+                                            @(isFavorite ? "★" : "☆")
+                                        </button>
+                                    }
                                     <button type="button"
                                             class="gwios-icon-button gwios-icon-button--primary"
                                             title="Bearbeiten"
@@ -110,55 +130,110 @@
 {
     <GwiOSDialog Title="@DialogTitle" CanClose="!_isSaving" OnClose="CloseDialog">
         <ChildContent>
-            <div class="gwios-form-field">
-                <label class="gwios-form-field-label">Typ</label>
-                <GwiOSPillGroup Items="@(["Einnahme", "Ausgabe"])"
-                                SelectedItem="@(_editType == CategoryType.Income ? "Einnahme" : "Ausgabe")"
-                                SelectedItemChanged="SelectEditType"
-                                AriaLabel="Typ"
-                                Variant="GwiOSPillGroupVariant.Toggles" />
-            </div>
-            <div class="gwios-form-grid">
-                <GwiOSFormField Label="Datum" InputId="booking-edit-date">
-                    <GwiOSDateBox Value="_editDate" ValueChanged="date => _editDate = date" AriaLabel="Datum" />
-                </GwiOSFormField>
-                <GwiOSFormField Label="Betrag" InputId="booking-edit-amount" IsRequired="true" ErrorMessage="@_amountError">
-                    <input id="booking-edit-amount" type="number" step="0.01" min="0" class="gwios-input" @bind="_editAmount" />
-                </GwiOSFormField>
-            </div>
-            <GwiOSFormField Label="Kategorie" InputId="booking-edit-category" ErrorMessage="@_categoryError">
-                <GwiOSCategorySelect id="booking-edit-category"
-                                     Categories="_categories"
-                                     Type="_editType"
-                                     SelectedCategoryId="_editCategoryId"
-                                     SelectedCategoryIdChanged="id => _editCategoryId = id"
-                                     AriaLabel="Kategorie" />
+            @if (_flashMessage is not null)
+            {
+                <div class="gwios-booking-flash" role="status">@_flashMessage</div>
+            }
+            @if (IsNewBooking)
+            {
+                <GwiOSBookingTemplateChips Templates="_bookingTemplates"
+                                           ActiveTemplateId="ActiveTemplateId"
+                                           OnSelect="ApplyTemplate" />
+            }
+            else if (_editedBooking.RecurringItemId is not null)
+            {
+                <div class="gwios-booking-recurring">
+                    <GwiOSRecurringItemLabel RecurringItems="_recurringItems"
+                                             RecurringItemId="_editedBooking.RecurringItemId" />
+                    <span class="gwios-booking-recurring-hint">aus Fixposten</span>
+                </div>
+            }
+            <GwiOSFormField Label="Betrag" InputId="booking-edit-amount">
+                <GwiOSAmountBox InputId="booking-edit-amount"
+                                @bind-Value="_editAmountText"
+                                Type="_editType"
+                                ErrorMessage="@_amountError"
+                                FocusRequest="_amountFocusRequest"
+                                OnEnter="SaveBookingAsync" />
             </GwiOSFormField>
             <GwiOSFormField Label="Beschreibung" InputId="booking-edit-description">
                 <GwiOSTextBox id="booking-edit-description"
-                              @bind-Value="_editDescription"
-                              Placeholder="z. B. Wocheneinkauf"
+                              Value="@_editDescription"
+                              ValueChanged="ChangeDescription"
+                              Placeholder="z. B. Edeka"
                               MaxLength="200"
-                              OnEnter="SaveBookingAsync" />
+                              enterkeyhint="next"
+                              autocomplete="off" />
             </GwiOSFormField>
-            <div class="gwios-form-field">
-                <label class="gwios-form-field-label">Status</label>
-                <GwiOSPillGroup Items="@(["Gebucht", "Ausstehend"])"
-                                SelectedItem="@(_editStatus == BookingStatus.Booked ? "Gebucht" : "Ausstehend")"
-                                SelectedItemChanged="SelectEditStatus"
-                                AriaLabel="Status"
-                                Variant="GwiOSPillGroupVariant.Toggles" />
+            <GwiOSCategoryPicker Categories="_categories"
+                                 SelectedCategoryId="_editCategoryId"
+                                 SelectedCategoryIdChanged="SelectCategory"
+                                 Type="_editType"
+                                 TypeChanged="type => _editType = type"
+                                 ErrorMessage="@_categoryError" />
+            <div class="gwios-booking-section">
+                <span class="gwios-booking-section-label">Datum</span>
+                <GwiOSDateChips @bind-Value="_editDate" Today="Today" />
             </div>
+            <div class="gwios-booking-more">
+                <button type="button"
+                        class="gwios-link-button gwios-booking-more-toggle"
+                        aria-expanded="@(_isMoreOpen ? "true" : "false")"
+                        @onclick="() => _isMoreOpen = !_isMoreOpen">
+                    @MoreLabel
+                </button>
+                <button type="button"
+                        class="gwios-chip gwios-booking-favorite @(IsFormFavorite ? "gwios-chip--favorite gwios-chip--selected" : null)"
+                        title="@(IsFormFavorite ? "Favorit entfernen" : "Beschreibung und Kategorie als Favorit anheften (ohne Betrag)")"
+                        aria-pressed="@(IsFormFavorite ? "true" : "false")"
+                        @onclick="ToggleFavoriteFromFormAsync">
+                    @(IsFormFavorite ? "★ Favorit" : "☆ Als Favorit speichern")
+                </button>
+            </div>
+            @if (_favoriteError is not null)
+            {
+                <span class="gwios-booking-favorite-error" role="alert">@_favoriteError</span>
+            }
+            @if (_isMoreOpen)
+            {
+                <div class="gwios-booking-section">
+                    <span class="gwios-booking-section-label">Status</span>
+                    <GwiOSPillGroup Items="@(["Gebucht", "Ausstehend"])"
+                                    SelectedItem="@(_editStatus == BookingStatus.Booked ? "Gebucht" : "Ausstehend")"
+                                    SelectedItemChanged="SelectEditStatus"
+                                    AriaLabel="Status"
+                                    Variant="GwiOSPillGroupVariant.Toggles" />
+                </div>
+            }
         </ChildContent>
         <Actions>
             <button type="button" class="gwios-button gwios-button--secondary" disabled="@_isSaving" @onclick="CloseDialog">
                 Abbrechen
             </button>
+            @if (IsNewBooking)
+            {
+                <button type="button"
+                        class="gwios-button gwios-button--secondary gwios-booking-save-next"
+                        disabled="@_isSaving"
+                        @onclick="SaveBookingAndContinueAsync">
+                    Speichern &amp; weitere
+                </button>
+            }
             <button type="button" class="gwios-button" disabled="@_isSaving" @onclick="SaveBookingAsync">
                 @(_isSaving ? "Speichert …" : "Speichern")
             </button>
         </Actions>
     </GwiOSDialog>
+}
+
+@if (_undoBar is not null)
+{
+    <GwiOSUndoBar @key="_undoBar"
+                  Text="@_undoBar.Text"
+                  CanUndo="_undoBar.CanUndo"
+                  Duration="_undoBar.Duration"
+                  OnUndo="UndoLastBookingAsync"
+                  OnExpired="() => _undoBar = null" />
 }
 
 @if (_isProposalDialogOpen)

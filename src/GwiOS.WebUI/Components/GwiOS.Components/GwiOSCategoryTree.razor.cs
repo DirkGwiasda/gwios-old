@@ -6,7 +6,7 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 
 /// <summary>
 /// Recursive tree of the categories of one type, with per-category sums, collapsing and the actions of the
-/// Kategorien tab. Renders itself for each level of the tree.
+/// Kategorien tab, including marking a category as favorite. Renders itself for each level of the tree.
 /// </summary>
 public partial class GwiOSCategoryTree
 {
@@ -36,6 +36,13 @@ public partial class GwiOSCategoryTree
     /// </summary>
     [Parameter, EditorRequired]
     public EventCallback<Guid> OnToggleCollapse { get; set; }
+
+    /// <summary>
+    /// Raised with the category whose favorite mark should switch: a favorite is offered as a chip when a booking is
+    /// entered.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public EventCallback<Category> OnToggleFavorite { get; set; }
 
     /// <summary>
     /// Raised with the parent category a new sub-category should be added under.

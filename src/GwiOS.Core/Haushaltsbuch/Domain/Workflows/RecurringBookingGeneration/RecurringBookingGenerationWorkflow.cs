@@ -75,7 +75,6 @@ internal sealed class RecurringBookingGenerationWorkflow(
                 Date = proposedBooking.Date,
                 Type = proposedBooking.Type,
                 CategoryId = proposedBooking.CategoryId,
-                Description = proposedBooking.Name,
                 Amount = proposedBooking.Amount,
                 Status = BookingStatus.Pending,
                 RecurringItemId = proposedBooking.RecurringItemId

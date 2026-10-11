@@ -5,7 +5,7 @@ namespace GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.RecurringItemManagement
 
 /// <summary>
 /// Stands in for <see cref="IRecurringItemScheduler"/>: returns <see cref="DueDates"/> for every item and month and
-/// records what it was asked for.
+/// <see cref="IsValid"/> for every item and day, and records the due dates it was asked for.
 /// </summary>
 public sealed class RecurringItemSchedulerFake : IRecurringItemScheduler
 {
@@ -19,9 +19,17 @@ public sealed class RecurringItemSchedulerFake : IRecurringItemScheduler
     /// </summary>
     public List<(RecurringItem RecurringItem, DateOnly Month)> Requests { get; } = [];
 
+    /// <summary>
+    /// What every validity check returns.
+    /// </summary>
+    public bool IsValid { get; set; } = true;
+
     public IReadOnlyList<DateOnly> GetDueDates(RecurringItem recurringItem, DateOnly month)
     {
         Requests.Add((recurringItem, month));
         return DueDates;
     }
+
+    public bool IsValidOn(RecurringItem recurringItem, DateOnly date)
+        => IsValid;
 }

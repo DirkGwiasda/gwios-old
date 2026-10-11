@@ -5,7 +5,8 @@
      aria-labelledby="@_titleId"
      tabindex="-1"
      @ref="_dialogElement"
-     @onkeydown="OnKeyDownAsync">
+     @onkeydown="OnKeyDownAsync"
+     @onkeydown:stopPropagation="true">
     <header class="gwios-dialog-header">
         <h2 id="@_titleId" class="gwios-dialog-title">@Title</h2>
         @HeaderContent

@@ -1,8 +1,10 @@
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts.Models;
 using GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.BookingManagement.Contracts;
+using GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.BookingTemplateManagement.Contracts;
 using GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts;
 using GwiOS.Core.Tests.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
 using HaushaltsbuchOverviewWorkflowUnderTest =
@@ -18,11 +20,16 @@ public sealed class GetOverviewAsyncTests
     private readonly CategoryManagerFake _categoryManager = new();
     private readonly RecurringItemManagerFake _recurringItemManager = new();
     private readonly BookingManagerFake _bookingManager = new();
+    private readonly BookingTemplateManagerFake _bookingTemplateManager = new();
     private readonly HaushaltsbuchOverviewWorkflowUnderTest _workflow;
 
     public GetOverviewAsyncTests()
     {
-        _workflow = new HaushaltsbuchOverviewWorkflowUnderTest(_categoryManager, _recurringItemManager, _bookingManager);
+        _workflow = new HaushaltsbuchOverviewWorkflowUnderTest(
+            _categoryManager,
+            _recurringItemManager,
+            _bookingManager,
+            _bookingTemplateManager);
     }
 
     [Fact]
@@ -60,6 +67,22 @@ public sealed class GetOverviewAsyncTests
             TestContext.Current.CancellationToken);
 
         Assert.Same(inRange, Assert.Single(overview.Bookings));
+    }
+
+    [Fact]
+    public async Task ReturnsAllBookingTemplatesInTheirOrder()
+    {
+        BookingTemplate first = new() { Description = "Edeka", CategoryId = Guid.CreateVersion7() };
+        BookingTemplate second = new() { Description = "Bäcker", CategoryId = Guid.CreateVersion7() };
+        _bookingTemplateManager.Add(first);
+        _bookingTemplateManager.Add(second);
+
+        HaushaltsbuchOverviewData overview = await _workflow.GetOverviewAsync(
+            new DateOnly(2026, 9, 1),
+            new DateOnly(2026, 9, 30),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal([first, second], overview.BookingTemplates);
     }
 
     private static Booking CreateBooking(DateOnly date)

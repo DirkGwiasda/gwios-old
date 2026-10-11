@@ -41,6 +41,26 @@ public sealed class UpdateAsyncTests(PostgresTestDatabase database) : IAsyncLife
     }
 
     [Fact]
+    public async Task OverwritesThePredecessorAndTheValidityOfTheStoredRecurringItem()
+    {
+        RecurringItem predecessor = await _testRecurringItems.CreateAsync(TestContext.Current.CancellationToken);
+        await _recurringItemRepository.InsertAsync(predecessor, TestContext.Current.CancellationToken);
+        RecurringItem recurringItem = await _testRecurringItems.CreateAsync(TestContext.Current.CancellationToken);
+        await _recurringItemRepository.InsertAsync(recurringItem, TestContext.Current.CancellationToken);
+        recurringItem.PredecessorId = predecessor.Id;
+        recurringItem.ValidFrom = new DateOnly(2026, 11, 1);
+        recurringItem.ValidUntil = new DateOnly(2027, 10, 31);
+
+        await _recurringItemRepository.UpdateAsync(recurringItem, TestContext.Current.CancellationToken);
+
+        RecurringItem? stored = await _testRecurringItems.FindStoredAsync(recurringItem.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(predecessor.Id, stored.PredecessorId);
+        Assert.Equal(new DateOnly(2026, 11, 1), stored.ValidFrom);
+        Assert.Equal(new DateOnly(2027, 10, 31), stored.ValidUntil);
+    }
+
+    [Fact]
     public async Task ThrowsRecurringItemNotFoundException_WhenTheRecurringItemIsNotStored()
     {
         RecurringItem recurringItem = await _testRecurringItems.CreateAsync(TestContext.Current.CancellationToken);

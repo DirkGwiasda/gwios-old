@@ -86,4 +86,20 @@ public sealed class RenderingTests : BunitContext
         Assert.Equal("true", input.GetAttribute("aria-invalid"));
         Assert.Equal("Dieser Name ist bereits vergeben", input.GetAttribute("title"));
     }
+
+    [Fact]
+    public void TakesTheFocus_WhenAFocusRequestIsPending()
+    {
+        Render<GwiOSTextBoxUnderTest>(parameters => parameters.Add(component => component.FocusRequest, 1));
+
+        JSInterop.VerifyFocusAsyncInvoke();
+    }
+
+    [Fact]
+    public void DoesNotTakeTheFocus_WithoutAFocusRequest()
+    {
+        Render<GwiOSTextBoxUnderTest>();
+
+        JSInterop.VerifyNotInvoke("Blazor._internal.domWrapper.focus");
+    }
 }
