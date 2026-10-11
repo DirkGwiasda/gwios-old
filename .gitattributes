@@ -1,0 +1,18 @@
+# Zeilenenden: Im Repository stehen Textdateien immer mit LF. Beim Auschecken bekommt jedes System sein eigenes
+# Format (Windows CRLF, Linux LF), so dass Arbeiten auf Windows und auf Linux keine reinen Zeilenend-Änderungen mehr
+# erzeugt.
+* text=auto
+
+# Läuft unter Linux (Raspberry Pi, Container, ESP-IDF-Werkzeuge) und braucht dort LF, auch wenn unter Windows
+# ausgecheckt und von dort kopiert oder gebaut wird.
+*.sh                text eol=lf
+Dockerfile          text eol=lf
+docker-compose.yml  text eol=lf
+
+# Binärdateien nie verändern und nicht als Text vergleichen.
+*.png    binary
+*.jpg    binary
+*.ico    binary
+*.pdf    binary
+*.ttf    binary
+*.woff2  binary
