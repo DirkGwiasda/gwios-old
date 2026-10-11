@@ -1,6 +1,8 @@
+using GwiOS.Core.CrossCutting.Logging.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.CategoryManagement.Contracts.Models;
 using GwiOS.WebUI.AmountExpressions;
 using GwiOS.WebUI.AmountExpressions.Contracts;
+using GwiOS.WebUI.Tests.TestInfrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using GwiOSAmountBoxUnderTest = GwiOS.WebUI.Components.GwiOS.Components.GwiOSAmountBox;
 
@@ -12,7 +14,10 @@ namespace GwiOS.WebUI.Tests.Components.GwiOS.Components.GwiOSAmountBox;
 public abstract class GwiOSAmountBoxProbe : BunitContext
 {
     protected GwiOSAmountBoxProbe()
-        => Services.AddSingleton<IAmountExpressionEvaluator, AmountExpressionEvaluator>();
+    {
+        Services.AddSingleton<ILogger<AmountExpressionEvaluator>, LoggerFake<AmountExpressionEvaluator>>();
+        Services.AddSingleton<IAmountExpressionEvaluator, AmountExpressionEvaluator>();
+    }
 
     /// <summary>
     /// The values reported through <c>ValueChanged</c>, in order.

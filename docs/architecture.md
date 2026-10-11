@@ -150,7 +150,7 @@ Design-Vorlage (`docs/UI/GwiOS.WebUI.Design.html`, Modul „Haushaltsbuch (HaBu)
 | Manager | Entität | Aufgaben | Helfer |
 |---|---|---|---|
 | `CategoryManagement` | `Category`: Name, Typ (Einnahme/Ausgabe), übergeordnete Kategorie (bis zu 5 Ebenen), Farbe (nur an Wurzeln), Favorit (`IsFavorite`) | Anlegen, Ändern (auch Favorit markieren/entmarkieren), Löschen (verweigert bei Unterkategorien oder Verwendung in Buchungen/Fixposten), Lesen | Validator, `CategoryPostgresRepository` |
-| `BookingManagement` | `Booking`: Datum, Typ, Kategorie, Betrag, Beschreibung, Status (gebucht/ausstehend), optionaler Verweis auf den erzeugenden Fixposten | Anlegen, Ändern, Löschen, Lesen nach Monat/Zeitraum | Validator, `BookingPostgresRepository` |
+| `BookingManagement` | `Booking`: Datum, Typ, Kategorie, Betrag, Beschreibung, Status (gebucht/ausstehend), optionaler Verweis auf den erzeugenden Fixposten | Anlegen, Ändern, Löschen, Lesen nach Monat/Zeitraum; Vorschläge für die Beschreibung (alle Kombinationen aus Beschreibung und Kategorie mit Häufigkeit und letztem Datum, per `GROUP BY` direkt aus den Buchungen, keine eigene Tabelle) | Validator, `BookingPostgresRepository` |
 | `RecurringItemManagement` | `RecurringItem`: Name, Typ, Kategorie, Betrag, Turnus (wöchentlich/monatlich/quartalsweise/jährlich), Fälligkeitstag, Startmonat, aktiv, Vorgänger (`PredecessorId`), Gültigkeit (`ValidFrom`/`ValidUntil`) | Anlegen, Ändern, Fortführen ab Stichtag, Aktivieren/Deaktivieren, Löschen (Löschen eines Nachfolgers öffnet den Vorgänger wieder), Lesen, Fälligkeiten und Gültigkeit an einem Tag | Validator, Scheduler, `RecurringItemPostgresRepository` |
 | `MonthReviewManagement` | `MonthReview`: Monat (1. des Monats), Zeitpunkt der Prüfung | Als geprüft markieren (upsert, wiederholbar), Prüfstatus eines Monats lesen | Validator, `MonthReviewPostgresRepository` |
 | `BookingTemplateManagement` | `BookingTemplate` (Favorit): Beschreibung, Kategorie, Position; kein Betrag, kein Datum | Anlegen (hinten angehängt), Ändern von Beschreibung/Kategorie, Verschieben nach oben/unten (nummeriert alle Positionen neu), Löschen, Lesen in Reihenfolge; Beschreibung + Kategorie eindeutig (Validator); wird mit seiner Kategorie per Fremdschlüssel `ON DELETE CASCADE` gelöscht | Validator, `BookingTemplatePostgresRepository` |
@@ -164,6 +164,7 @@ Design-Vorlage (`docs/UI/GwiOS.WebUI.Design.html`, Modul „Haushaltsbuch (HaBu)
 | `CategoryDeletionWorkflow` | Category, RecurringItem, Booking | Prüft vor dem Löschen, ob die Kategorie noch in einem Fixposten oder einer Buchung verwendet wird (`CategoryInUseException`); erst dann ruft er `CategoryManager.DeleteCategoryAsync` auf, das weiterhin selbst auf Unterkategorien prüft (`CategoryHasChildrenException`) |
 | `RecurringItemContinuationWorkflow` | RecurringItem, Booking | Führt einen Fixposten ab einem Stichtag fort (`RecurringItemManager.ContinueRecurringItemAsync`) und stellt danach die aus dem Vorgänger erzeugten Buchungen ab dem Stichtag — höchstens 12 Monate zurück einschließlich des aktuellen Monats — auf Typ, Kategorie, Betrag und Verweis des Nachfolgers um; Beschreibung und Status bleiben. Liefert vorab eine Vorschau der Buchungen, die nicht auf einem Fälligkeitstag des Nachfolgers liegen; je nach Wahl (`BookingDateHandling`) behalten sie ihr Datum oder werden auf einen freien Fälligkeitstag ihres Monats verschoben bzw. gelöscht, wenn keiner frei ist. Schlägt das Fortführen fehl, bleiben die Buchungen unverändert |
 | `AvailableBalanceWorkflow` | RecurringItem, Booking | Verfügbarer Saldo eines Monats: fällige aktive Fixeinnahmen (je Fälligkeitstermin, gebucht oder nicht) + gebuchte andere Einnahmen − fällige aktive Fixkosten − gebuchte andere Ausgaben. „Andere“ Buchungen sind solche ohne Fixposten-Verweis; ausstehende Buchungen zählen nicht |
+| `MonthOverviewWorkflow` | Booking, Category | Monatsübersicht wie eine Bilanz, aber untereinander: je Typ (erst Einnahmen, dann Ausgaben) der Kategorienbaum mit der Summe der Buchungen direkt in der Kategorie und der Summe einschließlich aller Unterkategorien, dazu Summen und Saldo. Zählt gebuchte und ausstehende Buchungen des Monats; Kategorien ohne Buchungen in oder unter sich fallen weg. Bedient den Dialog im Dashboard und das PDF |
 
 ### Hosts
 
@@ -171,7 +172,8 @@ Design-Vorlage (`docs/UI/GwiOS.WebUI.Design.html`, Modul „Haushaltsbuch (HaBu)
   `HaushaltsbuchOverviewWorkflow`; Anlegen/Ändern einzelner Buchungen, Fixposten und Kategorien geht direkt an den
   jeweiligen Manager, Löschen einer Kategorie über `CategoryDeletionWorkflow`. Favoriten (Anheften per ☆ im
   Buchungsdialog und in der Buchungsliste, Umbenennen/Verschieben/Löschen im Tab „Kategorien“) gehen direkt an den
-  `BookingTemplateManager`, das Markieren einer Kategorie als Favorit an den `CategoryManager`.
+  `BookingTemplateManager`, das Markieren einer Kategorie als Favorit an den `CategoryManager`. Die Vorschläge für
+  die Beschreibung holt der Buchungsdialog beim Öffnen direkt vom `BookingManager`.
 - Beim Öffnen des Dashboard-Tabs in einem noch nicht geprüften Monat ruft die Seite
   `RecurringBookingGenerationWorkflow` auf und zeigt bei offenen Vorschlägen automatisch ein Popup mit den fälligen
   Fixposten zum Abhaken; wird es ohne Bestätigung verlassen, bleibt der Monat ungeprüft und das Popup erscheint beim
@@ -253,6 +255,12 @@ Design-Vorlage (`docs/UI/GwiOS.WebUI.Design.html`, Modul „Haushaltsbuch (HaBu)
   Kategoriepfade als Namen mit, damit Seite und PDF keine eigene Pfadlogik brauchen. Das PDF entsteht im Host
   (`GwiOS.WebUI/Pdf`, QuestPDF unter der Community-Lizenz, Schrift Inter eingebettet) und wird über
   `GET /api/haushaltsbuch/fixkosten-prognose` geliefert.
+- Haushaltsbuch, Monatsübersicht (11.10.2026, Vorgabe von Dirk): neuer `MonthOverviewWorkflow` liefert den
+  Kategorienbaum eines Monats mit direkten und aufsummierten Beträgen; das Dashboard zeigt ihn im Dialog
+  (`GwiOSMonthOverview`) in Staffelform (eine Betragsspalte je Ebene, Hauptkategorien rechts; Aufbereitung für Dialog
+  und PDF gemeinsam in `MonthOverviewLayout`), das PDF entsteht wie die Prognose im Host (`MonthOverviewPdfRenderer`) und wird über
+  `GET /api/haushaltsbuch/monatsuebersicht?monat=JJJJ-MM` bei jedem Aufruf neu erzeugt und direkt ausgeliefert, nicht
+  auf dem Server gespeichert.
 - Haushaltsbuch, Fortführen von Fixposten (08.10.2026, Vorgabe und Modell von Dirk): Ändert sich ein Fixposten ab
   einem Stichtag (z. B. Versicherungsbeitrag), endet der bisherige Posten am Vortag (`ValidUntil`) und bleibt
   gespeichert; ein neuer Posten mit `PredecessorId` und `ValidFrom` = Stichtag übernimmt. Statt nur den Aktiv-Schalter

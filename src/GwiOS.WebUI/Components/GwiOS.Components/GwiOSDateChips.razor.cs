@@ -6,7 +6,8 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 /// <summary>
 /// Picks a date with a single tap: "Heute", "Gestern" and "Vorgestern" as chips, any other date through a calendar
 /// chip that then shows the chosen date. Meant for entering bookings, which mostly happen today or were just
-/// forgotten for a day or two.
+/// forgotten for a day or two. A recently entered date can be offered as an extra chip "Zuletzt", so that several
+/// bookings of one older day can be entered in a row.
 /// </summary>
 public partial class GwiOSDateChips
 {
@@ -31,13 +32,26 @@ public partial class GwiOSDateChips
     public DateOnly Today { get; set; }
 
     /// <summary>
+    /// The date entered last, offered as the chip "Zuletzt"; or <c>null</c> for none. No chip is added for a date
+    /// that "Heute", "Gestern" or "Vorgestern" already covers.
+    /// </summary>
+    [Parameter]
+    public DateOnly? RecentDate { get; set; }
+
+    /// <summary>
     /// Accessible name of the group.
     /// </summary>
     [Parameter]
     public string AriaLabel { get; set; } = "Datum";
 
+    private bool IsRecentDateChipShown
+        => (RecentDate is DateOnly recentDate) && !IsRelativeDay(recentDate);
+
     private bool IsCustomDate
-        => (Value > Today) || (Value < Today.AddDays(-(RelativeDays.Length - 1)));
+        => !IsRelativeDay(Value) && !(IsRecentDateChipShown && (Value == RecentDate));
+
+    private bool IsRelativeDay(DateOnly date)
+        => (date <= Today) && (date >= Today.AddDays(-(RelativeDays.Length - 1)));
 
     private async Task SelectAsync(DateOnly date)
     {

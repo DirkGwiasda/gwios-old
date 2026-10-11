@@ -40,9 +40,20 @@ public sealed class SelectTests : BunitContext
         Assert.Empty(_reportedDates);
     }
 
-    private IRenderedComponent<GwiOSDateChipsUnderTest> RenderChips()
+    [Fact]
+    public void ReportsTheRecentDate_WhenItsChipIsClicked()
+    {
+        IRenderedComponent<GwiOSDateChipsUnderTest> chips = RenderChips(new DateOnly(2026, 10, 3));
+
+        chips.FindAll("button").Single(button => button.TextContent.Trim() == "Zuletzt 03.10.").Click();
+
+        Assert.Equal([new DateOnly(2026, 10, 3)], _reportedDates);
+    }
+
+    private IRenderedComponent<GwiOSDateChipsUnderTest> RenderChips(DateOnly? recentDate = null)
         => Render<GwiOSDateChipsUnderTest>(parameters => parameters
             .Add(component => component.Value, Today)
             .Add(component => component.ValueChanged, (DateOnly date) => _reportedDates.Add(date))
-            .Add(component => component.Today, Today));
+            .Add(component => component.Today, Today)
+            .Add(component => component.RecentDate, recentDate));
 }

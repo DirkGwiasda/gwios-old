@@ -1,0 +1,40 @@
+<div class="gwios-description-box">
+    <input id="@InputId"
+           type="text"
+           class="gwios-input gwios-description-box-input"
+           value="@Value"
+           placeholder="@Placeholder"
+           maxlength="@MaxLength"
+           autocomplete="off"
+           enterkeyhint="next"
+           role="combobox"
+           aria-label="Beschreibung"
+           aria-autocomplete="list"
+           aria-expanded="@(IsListShown ? "true" : "false")"
+           aria-controls="@_listId"
+           aria-activedescendant="@(IsListShown && (_highlightedIndex >= 0) ? OptionId(_highlightedIndex) : null)"
+           @oninput="OnInputAsync"
+           @onchange="OnChangeAsync"
+           @onkeydown="OnKeyDownAsync"
+           @onkeydown:stopPropagation="IsListShown"
+           @onblur="CloseList" />
+
+    @if (IsListShown)
+    {
+        <div id="@_listId" class="gwios-description-box-list" role="listbox" aria-label="Vorschläge">
+            @for (int index = 0; index < _matches.Count; index++)
+            {
+                BookingSuggestion suggestion = _matches[index];
+                <div id="@OptionId(index)"
+                     class="gwios-description-box-option @(index == _highlightedIndex ? "gwios-description-box-option--highlighted" : null)"
+                     role="option"
+                     aria-selected="@(index == _highlightedIndex ? "true" : "false")"
+                     @onmousedown:preventDefault="true"
+                     @onclick="() => SelectAsync(suggestion)">
+                    <span class="gwios-description-box-text">@suggestion.Description</span>
+                    <GwiOSCategoryLabel Categories="Categories" CategoryId="suggestion.CategoryId" />
+                </div>
+            }
+        </div>
+    }
+</div>

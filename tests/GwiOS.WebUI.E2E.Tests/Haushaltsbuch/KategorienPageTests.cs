@@ -89,7 +89,7 @@ public sealed class KategorienPageTests(GwiOSAppFixture app) : IAsyncLifetime
             .CreateBookingTemplateAsync(new BookingTemplate
             {
                 Description = TestDataSeeder.CreateUniqueName("e2e-template"), CategoryId = category.Id
-            });
+            }, TestContext.Current.CancellationToken);
         string newName = $"{template.Description}-neu";
         await app.OpenAsync(_page, "/haushaltsbuch/kategorien");
         ILocator row = _page.Locator(".gwios-booking-template-row", new PageLocatorOptions { HasText = template.Description });

@@ -31,6 +31,14 @@ public interface IBookingManager
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns every combination of description and category used in the stored bookings, as suggestions for
+    /// entering a new booking, with how often and when last it was used; descriptions are compared without leading
+    /// or trailing white space, bookings without a description are left out. Ordered by usage count, then by the
+    /// date of last use, both descending. The list is empty if no booking has a description.
+    /// </summary>
+    Task<List<BookingSuggestion>> GetBookingSuggestionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes the booking with the given ID. Does nothing if no such booking is stored.
     /// </summary>
     Task DeleteBookingAsync(Guid bookingId, CancellationToken cancellationToken = default);

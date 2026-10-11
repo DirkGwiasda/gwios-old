@@ -48,8 +48,47 @@ public sealed class RenderingTests : BunitContext
         Assert.Equal("2026-10-11", chips.Find("input[type='date']").GetAttribute("value"));
     }
 
-    private IRenderedComponent<GwiOSDateChipsUnderTest> RenderChips(DateOnly value)
+    [Fact]
+    public void OffersNoRecentDateChip_WithoutARecentDate()
+    {
+        IRenderedComponent<GwiOSDateChipsUnderTest> chips = RenderChips(Today);
+
+        Assert.DoesNotContain(chips.FindAll("button"), button => button.TextContent.Contains("Zuletzt"));
+    }
+
+    [Fact]
+    public void OffersTheRecentDateAsChipBeforeTheCalendar()
+    {
+        IRenderedComponent<GwiOSDateChipsUnderTest> chips = RenderChips(Today, recentDate: new DateOnly(2026, 10, 3));
+
+        Assert.Equal(
+            ["Heute", "Gestern", "Vorgestern", "Zuletzt 03.10."],
+            chips.FindAll("button").Select(button => button.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void MarksTheRecentDateChipButNotTheCalendar_WhenTheRecentDateIsSelected()
+    {
+        DateOnly recentDate = new(2026, 10, 3);
+
+        IRenderedComponent<GwiOSDateChipsUnderTest> chips = RenderChips(recentDate, recentDate);
+
+        IElement selectedChip = Assert.Single(chips.FindAll(".gwios-chip--selected"));
+        Assert.Equal("Zuletzt 03.10.", selectedChip.TextContent.Trim());
+        Assert.Equal("📅", chips.Find(".gwios-date-chips-custom .gwios-chip").TextContent.Trim());
+    }
+
+    [Fact]
+    public void OffersNoRecentDateChip_WhenARelativeDayCoversTheRecentDate()
+    {
+        IRenderedComponent<GwiOSDateChipsUnderTest> chips = RenderChips(Today, recentDate: Today.AddDays(-1));
+
+        Assert.DoesNotContain(chips.FindAll("button"), button => button.TextContent.Contains("Zuletzt"));
+    }
+
+    private IRenderedComponent<GwiOSDateChipsUnderTest> RenderChips(DateOnly value, DateOnly? recentDate = null)
         => Render<GwiOSDateChipsUnderTest>(parameters => parameters
             .Add(component => component.Value, value)
-            .Add(component => component.Today, Today));
+            .Add(component => component.Today, Today)
+            .Add(component => component.RecentDate, recentDate));
 }

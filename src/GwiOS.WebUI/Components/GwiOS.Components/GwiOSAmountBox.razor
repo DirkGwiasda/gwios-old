@@ -6,7 +6,7 @@
         </span>
         <input id="@InputId"
                type="text"
-               inputmode="decimal"
+               inputmode="numeric"
                enterkeyhint="done"
                autocomplete="off"
                class="gwios-amount-box-input"
@@ -18,10 +18,6 @@
                @oninput="OnInputAsync"
                @onkeydown="OnKeyDownAsync" />
         <span class="gwios-amount-box-currency" aria-hidden="true">€</span>
-        <div class="gwios-amount-box-operators">
-            <button type="button" class="gwios-amount-box-operator" aria-label="Plus rechnen" @onclick="() => AppendOperatorAsync('+')">+</button>
-            <button type="button" class="gwios-amount-box-operator" aria-label="Minus rechnen" @onclick="() => AppendOperatorAsync('-')">−</button>
-        </div>
     </div>
     <div class="gwios-amount-box-footer">
         @if (ErrorMessage is not null)

@@ -9,6 +9,16 @@
             @label
         </button>
     }
+    @if (RecentDate is DateOnly recentDate && IsRecentDateChipShown)
+    {
+        <button type="button"
+                class="gwios-chip @(Value == recentDate ? "gwios-chip--selected" : null)"
+                title="Zuletzt eingegebenes Datum"
+                aria-pressed="@(Value == recentDate ? "true" : "false")"
+                @onclick="() => SelectAsync(recentDate)">
+            Zuletzt @recentDate.ToString("dd.MM.")
+        </button>
+    }
     <span class="gwios-date-chips-custom">
         <span class="gwios-chip @(IsCustomDate ? "gwios-chip--selected" : null)" aria-hidden="true">
             @(IsCustomDate ? $"📅 {Value:dd.MM.yyyy}" : "📅")

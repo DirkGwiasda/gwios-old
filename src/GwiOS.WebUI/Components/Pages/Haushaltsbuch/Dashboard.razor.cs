@@ -9,9 +9,13 @@ using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.AvailableBalance.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts.Models;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview.Contracts.Models;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts.Models;
 using GwiOS.WebUI.AmountExpressions.Contracts;
+using GwiOS.WebUI.BookingEntry.Contracts;
+using GwiOS.WebUI.BookingFilters.Contracts;
 using GwiOS.WebUI.Components.GwiOS.Components;
 using GwiOS.WebUI.StatusMessages.Contracts;
 using GwiOS.WebUI.StatusMessages.Contracts.Models;
@@ -23,9 +27,14 @@ namespace GwiOS.WebUI.Components.Pages.Haushaltsbuch;
 /// Dashboard tab of the Haushaltsbuch: the KPI figures and bookings of the selected month, where bookings are
 /// created, changed in a dialog and deleted, and where due recurring items are picked in a dialog to become bookings —
 /// automatically on the first visit of an unreviewed month, or on demand through the "Fixbuchungen generieren" button.
-/// The booking dialog is built for quick entry: favorites fill in description and category, the amount comes first
+/// The booking dialog is built for quick entry: favorites fill in description and category, the description suggests
+/// description and category of earlier bookings while typing, the amount comes first
 /// and may be a short calculation, the date is a tap away, several bookings can be entered in a row, and a new booking
 /// can be taken back from a bar shown after saving. Favorites are pinned and unpinned in the dialog and in the list.
+/// Within a session, a new booking starts with the date of the booking entered last, which also stays available as
+/// a chip, so that the receipts of an older day can be entered one after another. A text box above the list filters
+/// the bookings by category, description or amount. Above it, the month can be shown as an overview along the
+/// category tree, in a dialog or as a PDF to print.
 /// </summary>
 public partial class Dashboard
 {
@@ -42,7 +51,10 @@ public partial class Dashboard
     private List<Category> _categories = [];
     private List<RecurringItem> _recurringItems = [];
     private List<Booking> _bookings = [];
+    private List<Booking> _visibleBookings = [];
+    private string _filterText = string.Empty;
     private List<BookingTemplate> _bookingTemplates = [];
+    private List<BookingSuggestion> _bookingSuggestions = [];
     private List<ProposedBooking> _proposedBookings = [];
     private decimal _availableBalance;
 
@@ -66,6 +78,7 @@ public partial class Dashboard
     private bool _isSaving;
 
     private UndoBarState? _undoBar;
+    private MonthOverviewData? _monthOverview;
 
     [Inject]
     private IBookingManager BookingManager { get; set; } = default!;
@@ -87,6 +100,15 @@ public partial class Dashboard
 
     [Inject]
     private IAmountExpressionEvaluator AmountExpressionEvaluator { get; set; } = default!;
+
+    [Inject]
+    private IMonthOverviewWorkflow MonthOverviewWorkflow { get; set; } = default!;
+
+    [Inject]
+    private IBookingEntrySession BookingEntrySession { get; set; } = default!;
+
+    [Inject]
+    private IBookingFilter BookingFilter { get; set; } = default!;
 
     [Inject]
     private TimeProvider TimeProvider { get; set; } = default!;
@@ -117,6 +139,13 @@ public partial class Dashboard
 
     private decimal BookedBalance
         => IncomeBooked - ExpenseBooked;
+
+    // Relative, like the other links of the app, so that it works below a path base as well.
+    private string MonthOverviewPdfUrl
+        => $"api/haushaltsbuch/monatsuebersicht?monat={_month.ToString("yyyy-MM", CultureInfo.InvariantCulture)}";
+
+    private bool IsFiltered
+        => !string.IsNullOrWhiteSpace(_filterText);
 
     private bool IsNewBooking
         => (_editedBooking is not null) && !_bookings.Any(booking => booking.Id == _editedBooking.Id);
@@ -173,13 +202,15 @@ public partial class Dashboard
     private static string FormatSignedAmount(decimal value)
         => (value >= 0 ? "+ " : "– ") + Math.Abs(value).ToString("C", GermanCulture);
 
-    private void OpenNewBooking()
+    // The date of the booking entered last in this session, so that the receipts of one day can be entered in a row.
+    private async Task OpenNewBookingAsync()
     {
         _flashMessage = null;
-        ResetFormForNewBooking(Today);
+        ResetFormForNewBooking(BookingEntrySession.LastBookingDate ?? Today);
+        await LoadBookingSuggestionsAsync();
     }
 
-    private void OpenEditBooking(Booking booking)
+    private async Task OpenEditBookingAsync(Booking booking)
     {
         _editedBooking = booking;
         _editDate = booking.Date;
@@ -191,7 +222,12 @@ public partial class Dashboard
         _isMoreOpen = false;
         _flashMessage = null;
         ClearFormErrors();
+        await LoadBookingSuggestionsAsync();
     }
+
+    // Loaded when the dialog opens rather than with the month, since they span all bookings and are only needed here.
+    private async Task LoadBookingSuggestionsAsync()
+        => _bookingSuggestions = await BookingManager.GetBookingSuggestionsAsync();
 
     // Starts an empty form for the next booking; the date is kept, so a series of receipts from one day is quick.
     private void ResetFormForNewBooking(DateOnly date)
@@ -223,9 +259,16 @@ public partial class Dashboard
         => _editedBooking = null;
 
     private void ApplyTemplate(BookingTemplate template)
+        => ApplyDescriptionAndCategory(template.Description, template.CategoryId);
+
+    private void ApplySuggestion(BookingSuggestion suggestion)
+        => ApplyDescriptionAndCategory(suggestion.Description, suggestion.CategoryId);
+
+    // Takes over description, category and the type of the category, then moves on to the amount.
+    private void ApplyDescriptionAndCategory(string description, Guid categoryId)
     {
-        Category? category = _categories.FirstOrDefault(candidate => candidate.Id == template.CategoryId);
-        _editDescription = template.Description;
+        Category? category = _categories.FirstOrDefault(candidate => candidate.Id == categoryId);
+        _editDescription = description;
         _editCategoryId = category?.Id;
         _editType = category?.Type ?? _editType;
         ClearFormErrors();
@@ -262,6 +305,7 @@ public partial class Dashboard
             if (isNew)
             {
                 await BookingManager.CreateBookingAsync(booking);
+                BookingEntrySession.RememberBookingDate(booking.Date);
                 StatusMessages.Publish(StatusLevel.Neutral, $"Buchung über {FormatAmount(booking.Amount)} erfasst");
                 ShowUndoBar(booking);
             }
@@ -297,10 +341,12 @@ public partial class Dashboard
             _isSaving = false;
         }
 
+        BookingEntrySession.RememberBookingDate(booking.Date);
         StatusMessages.Publish(StatusLevel.Neutral, $"Buchung über {FormatAmount(booking.Amount)} erfasst");
         _flashMessage = $"✓ {DescribeBooking(booking)} – bereit für die nächste";
         ResetFormForNewBooking(booking.Date);
         await ReloadDataAsync();
+        await LoadBookingSuggestionsAsync();
     }
 
     private bool TryCreateBookingFromForm([NotNullWhen(true)] out Booking? booking)
@@ -410,6 +456,9 @@ public partial class Dashboard
         await ReloadDataAsync();
     }
 
+    private async Task OpenMonthOverviewAsync()
+        => _monthOverview = await MonthOverviewWorkflow.GetMonthOverviewAsync(_month);
+
     private void ToggleProposal(ProposedBooking proposal, bool isSelected)
     {
         if (isSelected)
@@ -478,12 +527,22 @@ public partial class Dashboard
         }
     }
 
+    private void ChangeFilter(string filterText)
+    {
+        _filterText = filterText;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+        => _visibleBookings = BookingFilter.Filter(_bookings, _categories, _recurringItems, _filterText);
+
     private async Task ReloadDataAsync()
     {
         HaushaltsbuchOverviewData overview = await OverviewWorkflow.GetOverviewAsync(FirstDay, LastDay);
         _categories = overview.Categories;
         _recurringItems = overview.RecurringItems;
         _bookings = overview.Bookings;
+        ApplyFilter();
         _bookingTemplates = overview.BookingTemplates;
         _availableBalance = await AvailableBalanceWorkflow.GetAvailableBalanceAsync(_month);
         _proposedBookings = await RecurringBookingGenerationWorkflow.GetProposedBookingsAsync(_month);

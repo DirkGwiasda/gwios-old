@@ -56,7 +56,7 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         ILocator dialog = await OpenNewBookingDialogAsync();
         await dialog.Locator("#booking-edit-amount").FillAsync("42.50");
         await PickCategoryBySearchAsync(dialog, category);
-        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await FillDescriptionAsync(dialog, description);
         await ClickSaveAsync(dialog);
 
         ILocator row = _page.Locator("tr", new PageLocatorOptions { HasText = description });
@@ -98,7 +98,8 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         await using TestDataSeeder seeder = new();
         Category category = await seeder.CreateExpenseCategoryAsync();
         category.IsFavorite = true;
-        await seeder.Services.GetRequiredService<ICategoryManager>().UpdateCategoryAsync(category);
+        await seeder.Services.GetRequiredService<ICategoryManager>()
+            .UpdateCategoryAsync(category, TestContext.Current.CancellationToken);
 
         await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
         ILocator dialog = await OpenNewBookingDialogAsync();
@@ -118,7 +119,7 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         ILocator dialog = await OpenNewBookingDialogAsync();
         await dialog.Locator("#booking-edit-amount").FillAsync("9,99");
         await PickCategoryBySearchAsync(dialog, category);
-        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await FillDescriptionAsync(dialog, description);
         await ClickSaveAsync(dialog);
 
         ILocator row = _page.Locator("tr", new PageLocatorOptions { HasText = description });
@@ -143,7 +144,7 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Gestern", Exact = true }).ClickAsync();
         await dialog.Locator("#booking-edit-amount").FillAsync("3,10");
         await PickCategoryBySearchAsync(dialog, category);
-        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await FillDescriptionAsync(dialog, description);
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Speichern & weitere" }).ClickAsync();
 
         await Expect(dialog.Locator(".gwios-booking-flash")).ToContainTextAsync("bereit für die nächste");
@@ -165,13 +166,13 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
         ILocator dialog = await OpenNewBookingDialogAsync();
         await PickCategoryBySearchAsync(dialog, category);
-        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await FillDescriptionAsync(dialog, description);
         await dialog.GetByRole(AriaRole.Button, new() { Name = "☆ Als Favorit speichern" }).ClickAsync();
 
         await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "★ Favorit" })).ToBeVisibleAsync();
         await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = $"★{description}" })).ToBeVisibleAsync();
         List<BookingTemplate> templates = await seeder.Services.GetRequiredService<IBookingTemplateManager>()
-            .GetAllBookingTemplatesAsync();
+            .GetAllBookingTemplatesAsync(TestContext.Current.CancellationToken);
         Assert.Contains(
             templates,
             template => (template.Description == description) && (template.CategoryId == category.Id));
@@ -257,6 +258,135 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task ANewBookingStartsWithTheDateEnteredLastInTheSession()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = TestDataSeeder.CreateUniqueName("e2e-recent-date");
+        DateOnly olderDate = DateOnly.FromDateTime(DateTime.Now).AddDays(-6);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.Locator("#booking-edit-amount").FillAsync("500");
+        await PickCategoryBySearchAsync(dialog, category);
+        await FillDescriptionAsync(dialog, description);
+        await dialog.Locator("input[type='date']").FillAsync(olderDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        await ClickSaveAsync(dialog);
+        await Expect(dialog).ToBeHiddenAsync();
+
+        dialog = await OpenNewBookingDialogAsync();
+
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = $"Zuletzt {olderDate:dd.MM.}" }))
+            .ToHaveAttributeAsync("aria-pressed", "true");
+
+        await CleanUpBookingAsync(seeder, description);
+    }
+
+    [Fact]
+    public async Task TheAmountTakesTheLastTwoOfThreeOrMoreDigitsAsCentsWhileTyping()
+    {
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        ILocator amount = dialog.Locator("#booking-edit-amount");
+
+        await amount.PressSequentiallyAsync("125");
+        await Expect(amount).ToHaveValueAsync("1,25");
+        await amount.PressSequentiallyAsync("0");
+        await Expect(amount).ToHaveValueAsync("12,50");
+
+        // A typed comma is dropped; it must not stay visible although the value does not change.
+        await amount.FillAsync(string.Empty);
+        await amount.PressSequentiallyAsync("12,");
+        await Expect(amount).ToHaveValueAsync("12");
+    }
+
+    [Fact]
+    public async Task TabLeadsFromTheAmountStraightToTheDescription()
+    {
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await Expect(dialog.Locator("#booking-edit-amount")).ToBeFocusedAsync();
+
+        await _page.Keyboard.PressAsync("Tab");
+
+        await Expect(dialog.Locator("#booking-edit-description")).ToBeFocusedAsync();
+    }
+
+    [Fact]
+    public async Task TheDescriptionSuggestsEarlierBookingsAndTakesOverTheirCategory()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = await CreateTodaysExpenseAsync(seeder, category, 4.2m, BookingStatus.Booked);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator dialog = await OpenNewBookingDialogAsync();
+        await dialog.Locator("#booking-edit-description").PressSequentiallyAsync(description[..^4]);
+        ILocator option = dialog.GetByRole(AriaRole.Option, new() { Name = description });
+        await Expect(option).ToContainTextAsync(category.Name);
+        await option.ClickAsync();
+
+        await Expect(dialog.Locator("#booking-edit-description")).ToHaveValueAsync(description);
+        await Expect(dialog.Locator(".gwios-category-picker-selected")).ToContainTextAsync(category.Name);
+        await Expect(dialog.Locator("#booking-edit-amount")).ToBeFocusedAsync();
+        await Expect(dialog.Locator("#booking-edit-amount")).ToHaveValueAsync(string.Empty);
+
+        await CleanUpBookingAsync(seeder, description);
+    }
+
+    [Fact]
+    public async Task TheMonthOverviewShowsTheBookedCategoriesAndCanBeDownloadedAsPdf()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string description = await CreateTodaysExpenseAsync(seeder, category, 7.77m, BookingStatus.Booked);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        IDownload download = await _page.RunAndWaitForDownloadAsync(
+            () => _page.GetByRole(AriaRole.Link, new() { Name = "Monatsübersicht drucken" }).ClickAsync());
+        Assert.Equal(
+            $"monatsuebersicht-{DateTime.Now.ToString("yyyy-MM", CultureInfo.InvariantCulture)}.pdf",
+            download.SuggestedFilename);
+
+        await _page.GetByRole(AriaRole.Button, new() { Name = "Monatsübersicht anzeigen" }).ClickAsync();
+
+        ILocator dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Monatsübersicht" });
+        await Expect(dialog.GetByText("Einnahmen", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(dialog.Locator(".gwios-month-overview-row", new() { HasText = category.Name })).ToContainTextAsync("7,77 €");
+
+        await CleanUpBookingAsync(seeder, description);
+    }
+
+    [Fact]
+    public async Task TheFilterAboveTheListFindsBookingsByDescriptionOrAmount()
+    {
+        await using TestDataSeeder seeder = new();
+        Category category = await seeder.CreateExpenseCategoryAsync();
+        string firstDescription = await CreateTodaysExpenseAsync(seeder, category, 8765.43m, BookingStatus.Booked);
+        string secondDescription = await CreateTodaysExpenseAsync(seeder, category, 1.11m, BookingStatus.Booked);
+
+        await app.OpenAsync(_page, "/haushaltsbuch/dashboard");
+        ILocator filter = _page.GetByRole(AriaRole.Searchbox, new() { Name = "Buchungen filtern" });
+        ILocator firstRow = _page.Locator("tr", new PageLocatorOptions { HasText = firstDescription });
+        ILocator secondRow = _page.Locator("tr", new PageLocatorOptions { HasText = secondDescription });
+
+        await filter.FillAsync(secondDescription.ToUpperInvariant());
+        await Expect(secondRow).ToBeVisibleAsync();
+        await Expect(firstRow).ToHaveCountAsync(0);
+
+        await filter.FillAsync("8765,4");
+        await Expect(firstRow).ToBeVisibleAsync();
+        await Expect(secondRow).ToHaveCountAsync(0);
+
+        await filter.FillAsync(string.Empty);
+        await Expect(firstRow).ToBeVisibleAsync();
+        await Expect(secondRow).ToBeVisibleAsync();
+
+        await CleanUpBookingAsync(seeder, firstDescription);
+        await CleanUpBookingAsync(seeder, secondDescription);
+    }
+
     private async Task<ILocator> OpenNewBookingDialogAsync()
     {
         await _page.GetByRole(AriaRole.Button, new() { Name = "+ Neue Buchung" }).ClickAsync();
@@ -275,6 +405,13 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         await treeDialog.GetByRole(AriaRole.Textbox, new() { Name = "Kategorien filtern" }).FillAsync(category.Name);
         await treeDialog.GetByRole(AriaRole.Button, new() { Name = category.Name, Exact = true }).ClickAsync();
         await Expect(treeDialog).ToBeHiddenAsync();
+    }
+
+    // Tab leaves the field, which closes the list of suggestions, so it cannot cover the next control to click.
+    private static async Task FillDescriptionAsync(ILocator dialog, string description)
+    {
+        await dialog.Locator("#booking-edit-description").FillAsync(description);
+        await dialog.Locator("#booking-edit-description").PressAsync("Tab");
     }
 
     // Exact, because "Speichern & weitere" would match as well.

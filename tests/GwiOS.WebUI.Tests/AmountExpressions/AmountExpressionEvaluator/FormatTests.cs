@@ -1,3 +1,4 @@
+using GwiOS.WebUI.Tests.TestInfrastructure;
 using AmountExpressionEvaluatorUnderTest = GwiOS.WebUI.AmountExpressions.AmountExpressionEvaluator;
 
 namespace GwiOS.WebUI.Tests.AmountExpressions.AmountExpressionEvaluator;
@@ -7,7 +8,7 @@ namespace GwiOS.WebUI.Tests.AmountExpressions.AmountExpressionEvaluator;
 /// </summary>
 public sealed class FormatTests
 {
-    private readonly AmountExpressionEvaluatorUnderTest _evaluator = new();
+    private readonly AmountExpressionEvaluatorUnderTest _evaluator = new(new LoggerFake<AmountExpressionEvaluatorUnderTest>());
 
     [Theory]
     [InlineData(47.83, "47,83")]

@@ -44,6 +44,21 @@ public sealed class TestBookings : IAsyncDisposable
     }
 
     /// <summary>
+    /// Returns a new, not yet stored, booked expense booking on the given date for an already stored category, e.g.
+    /// the category of a booking returned by <see cref="CreateAsync"/>.
+    /// </summary>
+    public Booking CreateForCategory(Guid categoryId, DateOnly date)
+    {
+        Booking booking = new()
+        {
+            Date = date, Type = CategoryType.Expense, CategoryId = categoryId, Amount = 58m,
+            Status = BookingStatus.Booked
+        };
+        _bookingIds.Add(booking.Id);
+        return booking;
+    }
+
+    /// <summary>
     /// Returns the stored booking with the given ID, or <c>null</c> if no such booking is stored.
     /// </summary>
     public async Task<Booking?> FindStoredAsync(Guid bookingId)

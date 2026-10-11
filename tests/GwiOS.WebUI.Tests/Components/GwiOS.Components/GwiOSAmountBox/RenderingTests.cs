@@ -13,7 +13,7 @@ public sealed class RenderingTests : GwiOSAmountBoxProbe
     {
         IRenderedComponent<GwiOSAmountBoxUnderTest> amountBox = RenderAmountBox();
 
-        Assert.Equal("decimal", amountBox.Find("input").GetAttribute("inputmode"));
+        Assert.Equal("numeric", amountBox.Find("input").GetAttribute("inputmode"));
         Assert.Equal("amount", amountBox.Find("input").Id);
     }
 
@@ -41,7 +41,9 @@ public sealed class RenderingTests : GwiOSAmountBoxProbe
         IRenderedComponent<GwiOSAmountBoxUnderTest> amountBox = RenderAmountBox("47,83");
 
         Assert.Empty(amountBox.FindAll(".gwios-amount-box-result"));
-        Assert.Equal("Rechnen geht auch, z. B. 12,50+3,20", amountBox.Find(".gwios-amount-box-hint").TextContent);
+        Assert.Equal(
+            "Ab drei Ziffern sind die letzten beiden Cent: 1250 → 12,50. Rechnen mit + und −.",
+            amountBox.Find(".gwios-amount-box-hint").TextContent);
     }
 
     [Fact]

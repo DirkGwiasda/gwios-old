@@ -17,6 +17,10 @@ using GwiOS.WebUI.Api.Haushaltsbuch.Contracts;
 using GwiOS.WebUI.Api.Satellites;
 using GwiOS.WebUI.Api.Satellites.Contracts;
 using GwiOS.WebUI.BackgroundServices;
+using GwiOS.WebUI.BookingEntry;
+using GwiOS.WebUI.BookingEntry.Contracts;
+using GwiOS.WebUI.BookingFilters;
+using GwiOS.WebUI.BookingFilters.Contracts;
 using GwiOS.WebUI.Components;
 using GwiOS.WebUI.E2E;
 using GwiOS.WebUI.Pdf;
@@ -54,10 +58,14 @@ public class Program
         // Scoped, so every circuit and thus every user session has status messages of its own.
         builder.Services.AddScoped<IStatusMessageService, StatusMessageService>();
         builder.Services.AddSingleton<IAmountExpressionEvaluator, AmountExpressionEvaluator>();
+        builder.Services.AddScoped<IBookingEntrySession, BookingEntrySession>();
+        builder.Services.AddSingleton<IBookingFilter, BookingFilter>();
         builder.Services.AddScoped<ISatellitePingEndpoint, SatellitePingEndpoint>();
         builder.Services.AddScoped<IDatabaseBackupEndpoint, DatabaseBackupEndpoint>();
         builder.Services.AddScoped<IRecurringItemForecastPdfEndpoint, RecurringItemForecastPdfEndpoint>();
         builder.Services.AddScoped<IRecurringItemForecastPdfRenderer, RecurringItemForecastPdfRenderer>();
+        builder.Services.AddScoped<IMonthOverviewPdfEndpoint, MonthOverviewPdfEndpoint>();
+        builder.Services.AddScoped<IMonthOverviewPdfRenderer, MonthOverviewPdfRenderer>();
         builder.Services.AddSingleton<IQuestPdfConfigurator, QuestPdfConfigurator>();
         builder.Services.Configure<MeasurementPollingOptions>(
             builder.Configuration.GetSection(MeasurementPollingOptions.SectionName));
@@ -158,11 +166,18 @@ public class Program
             .RequireAuthorization();
 
     private static void MapHaushaltsbuchApi(WebApplication app)
-        => app.MapGet(
+    {
+        app.MapGet(
                 $"{ApiPathPrefix}/haushaltsbuch/fixkosten-prognose",
                 (IRecurringItemForecastPdfEndpoint endpoint, CancellationToken cancellationToken)
                     => endpoint.HandleAsync(cancellationToken))
             .RequireAuthorization();
+        app.MapGet(
+                $"{ApiPathPrefix}/haushaltsbuch/monatsuebersicht",
+                ([FromQuery(Name = "monat")] string? month, IMonthOverviewPdfEndpoint endpoint, CancellationToken cancellationToken)
+                    => endpoint.HandleAsync(month, cancellationToken))
+            .RequireAuthorization();
+    }
 
     // Environment variables are part of the configuration; their names are used as keys unchanged.
     private static string GetGwiOSConnectionString(IConfiguration configuration)

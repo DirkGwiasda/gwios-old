@@ -1,21 +1,26 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
+using GwiOS.Core.CrossCutting.Logging.Contracts;
 using GwiOS.WebUI.AmountExpressions.Contracts;
 using GwiOS.WebUI.AmountExpressions.Contracts.Models;
 
 namespace GwiOS.WebUI.AmountExpressions;
 
-internal sealed partial class AmountExpressionEvaluator : IAmountExpressionEvaluator
+internal sealed partial class AmountExpressionEvaluator(ILogger<AmountExpressionEvaluator> logger)
+    : IAmountExpressionEvaluator
 {
     private static readonly AmountExpressionResult InvalidResult = new();
     private static readonly CultureInfo GermanCulture = CultureInfo.GetCultureInfo("de-DE");
+
+    private readonly ILogger<AmountExpressionEvaluator> _logger = logger;
 
     public AmountExpressionResult Evaluate(string text)
     {
         string expression = Normalize(text);
         if (!ExpressionRegex().IsMatch(expression))
         {
-            return InvalidResult;
+            return LogInvalid();
         }
 
         MatchCollection terms = TermRegex().Matches(expression);
@@ -24,7 +29,7 @@ internal sealed partial class AmountExpressionEvaluator : IAmountExpressionEvalu
         {
             if (!TryParseNumber(term.Groups["number"].Value, out decimal number))
             {
-                return InvalidResult;
+                return LogInvalid();
             }
 
             sum += term.Groups["sign"].Value == "-" ? -number : number;
@@ -37,8 +42,51 @@ internal sealed partial class AmountExpressionEvaluator : IAmountExpressionEvalu
         };
     }
 
+    // The amount itself is not logged; it is private data of the family.
+    private AmountExpressionResult LogInvalid()
+    {
+        _logger.LogDebug("Amount expression is invalid.");
+        return InvalidResult;
+    }
+
     public string Format(decimal amount)
         => amount.ToString("0.00", GermanCulture);
+
+    public string FormatInput(string text)
+    {
+        StringBuilder result = new();
+        StringBuilder digits = new();
+        foreach (char character in text)
+        {
+            if (char.IsAsciiDigit(character))
+            {
+                digits.Append(character);
+            }
+            else if (character is '+' or '-' or '−')
+            {
+                AppendNumber(result, digits);
+                result.Append(character);
+            }
+        }
+
+        AppendNumber(result, digits);
+        return result.ToString();
+    }
+
+    // From three digits on, the last two are the cents; leading zeros of the euros go, except a single one ("0,05").
+    private static void AppendNumber(StringBuilder result, StringBuilder digits)
+    {
+        string number = digits.ToString();
+        digits.Clear();
+        if (number.Length < 3)
+        {
+            result.Append(number);
+            return;
+        }
+
+        string euros = number[..^2].TrimStart('0');
+        result.Append(euros.Length == 0 ? "0" : euros).Append(',').Append(number[^2..]);
+    }
 
     private static string Normalize(string text)
         => WhiteSpaceRegex().Replace(text, string.Empty).Replace('−', '-');

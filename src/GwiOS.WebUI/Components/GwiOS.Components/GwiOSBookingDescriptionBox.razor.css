@@ -1,0 +1,56 @@
+.gwios-description-box {
+    position: relative;
+}
+
+.gwios-description-box-input {
+    width: 100%;
+}
+
+/* Die Liste liegt über dem Formular, damit es beim Tippen nicht springt. */
+.gwios-description-box-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid rgba(0, 136, 255, 0.3);
+    border-radius: 10px;
+    background: rgba(11, 18, 32, 0.98);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.gwios-description-box-option {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    min-height: 44px;
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+}
+
+.gwios-description-box-option:last-child {
+    border-bottom: none;
+}
+
+.gwios-description-box-option:hover,
+.gwios-description-box-option--highlighted {
+    background: rgba(0, 136, 255, 0.14);
+}
+
+.gwios-description-box-text {
+    flex: 1 1 140px;
+    min-width: 0;
+    color: var(--gwios-text);
+    font-size: 14px;
+}
+
+.gwios-description-box-option ::deep .gwios-category-label {
+    color: var(--gwios-text-dim);
+    font-size: 12.5px;
+}

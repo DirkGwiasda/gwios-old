@@ -20,4 +20,14 @@ public interface IAmountExpressionEvaluator
     /// separator, no thousands separator and no currency.
     /// </summary>
     string Format(decimal amount);
+
+    /// <summary>
+    /// Brings what the user typed into the form the field shows, keystroke by keystroke: only digits and the signs
+    /// <c>+</c>, <c>-</c> and <c>−</c> are kept, and in every number of at least three digits the last two digits
+    /// are the cents, so typing <c>1</c>, <c>2</c>, <c>5</c>, <c>0</c> shows <c>1</c>, <c>12</c>, <c>1,25</c>,
+    /// <c>12,50</c>. Numbers of one or two digits stay whole euros. A typed comma or dot is dropped, because the
+    /// decimal comma is always placed this way; an amount already in this form (e.g. from <see cref="Format"/>)
+    /// stays unchanged.
+    /// </summary>
+    string FormatInput(string text);
 }

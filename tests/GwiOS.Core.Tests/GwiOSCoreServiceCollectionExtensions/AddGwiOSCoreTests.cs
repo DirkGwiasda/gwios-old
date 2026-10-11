@@ -12,6 +12,8 @@ using GwiOS.Core.CrossCutting.Persons.Domain.Managers.PersonManagement.Contracts
 using GwiOS.Core.CrossCutting.Persons.Infrastructure;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement;
 using GwiOS.Core.Haushaltsbuch.Domain.Managers.RecurringItemManagement.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemForecast;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemForecast.Contracts;
 using GwiOS.Core.Satellites.Domain.Managers.MeasurementManagement;
@@ -115,6 +117,14 @@ public sealed class AddGwiOSCoreTests : IDisposable
         object service = _scope.ServiceProvider.GetRequiredService(serviceType);
 
         Assert.IsType(implementationType, service);
+    }
+
+    [Fact]
+    public void RegistersTheMonthOverviewWorkflow()
+    {
+        IMonthOverviewWorkflow workflow = _scope.ServiceProvider.GetRequiredService<IMonthOverviewWorkflow>();
+
+        Assert.IsType<MonthOverviewWorkflow>(workflow);
     }
 
     [Fact]

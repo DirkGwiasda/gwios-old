@@ -51,6 +51,22 @@ public sealed class BookingManagerFake : IBookingManager
             .ThenBy(booking => booking.Id)
             .ToList());
 
+    public Task<List<BookingSuggestion>> GetBookingSuggestionsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(_bookings
+            .Where(booking => !string.IsNullOrWhiteSpace(booking.Description))
+            .GroupBy(booking => (Description: booking.Description!.Trim(), booking.CategoryId))
+            .Select(group => new BookingSuggestion
+            {
+                Description = group.Key.Description,
+                CategoryId = group.Key.CategoryId,
+                UsageCount = group.Count(),
+                LastUsedOn = group.Max(booking => booking.Date)
+            })
+            .OrderByDescending(suggestion => suggestion.UsageCount)
+            .ThenByDescending(suggestion => suggestion.LastUsedOn)
+            .ThenBy(suggestion => suggestion.Description, StringComparer.Ordinal)
+            .ToList());
+
     public Task DeleteBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
         DeletedBookingIds.Add(bookingId);

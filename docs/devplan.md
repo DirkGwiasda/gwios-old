@@ -287,7 +287,7 @@ verschachteltes Bundle „Vorschlag2“ darin und lässt sich nur durch Entpacke
 - [x] Phase 1 Eingabemaske + Phase 3 Favoriten (11.10.2026, Umfang von Dirk gewählt: „Favoriten + Eingabemaske“):
       `BookingTemplateManagement` (Tabelle `haushaltsbuch.booking_templates`, beim Löschen der Kategorie per
       `ON DELETE CASCADE` mitgelöscht, Reihenfolge über `position`), Favoriten im `HaushaltsbuchOverviewWorkflow`.
-      Neue Komponenten `GwiOSAmountBox` (Betrag zuerst, `inputmode="decimal"`, Vorzeichen nach Typ, + / −, Ergebnis
+      Neue Komponenten `GwiOSAmountBox` (Betrag zuerst, `inputmode="decimal"` — inzwischen `numeric`, Vorzeichen nach Typ, + / − (Knöpfe inzwischen entfernt), Ergebnis
       „= 15,70 €“), `GwiOSDateChips`, `GwiOSCategoryPicker` (Favoriten-Chips, Suche über den vollen Pfad, Baum als
       Ausnahme, Typ-Umschalter — Suche und Baum inzwischen durch das Popup ersetzt, siehe unten), `GwiOSBookingTemplateChips`, `GwiOSBookingTemplateList`, `GwiOSUndoBar`; Dienst
       `IAmountExpressionEvaluator` (WebUI) für Rechnen im Betrag; zentrale Klassen `gwios-chip`, `gwios-chip-row`,
@@ -309,8 +309,49 @@ verschachteltes Bundle „Vorschlag2“ darin und lässt sich nur durch Entpacke
       Tasten nicht mehr an einen äußeren Dialog durch (Escape schließt nur den inneren) und zentriert ohne
       `transform` (sonst wäre der innere Dialog im äußeren gefangen). WebUI-Tests 542 grün; E2E-Hilfsmethode
       angepasst, nicht gelaufen; nicht im Browser angesehen.
-- [ ] Phase 2 Autovervollständigung über die Beschreibung (`IBookingManager.GetBookingSuggestionsAsync`) mit
-      „Häufig“-Chips und dem letzten Betrag als grauem Platzhalter — in der Vorlage enthalten, bewusst nicht umgesetzt.
+- [x] Batch-Eingabe, Filter, Cent-Automatik (11.10.2026, Vorgaben von Dirk):
+      - Datum: Ab der zweiten neuen Buchung einer Sitzung steht neben Heute/Gestern/Vorgestern/📅 der Chip
+        „Zuletzt TT.MM.“ mit dem Datum der zuletzt angelegten Buchung, und neue Buchungen starten mit diesem Datum.
+        Sitzung = Blazor-Circuit (neuer WebUI-Dienst `IBookingEntrySession`, scoped; ein Neuladen der Seite beginnt
+        neu). Deckt Heute/Gestern/Vorgestern das Datum schon ab, gibt es keinen eigenen Chip, der passende ist
+        vorgewählt.
+      - Kalender-Chip reagierte am Desktop (Chrome/Edge) schlecht: Das unsichtbare Datumsfeld öffnet den Kalender
+        dort nur über sein kleines Kalendersymbol am rechten Rand, ein Klick daneben setzte nur den Cursor in
+        Tag/Monat/Jahr. Das Symbol wird jetzt per CSS über das ganze Feld gezogen. **Nicht im Browser geprüft.**
+      - Filter über der Buchungsliste im Dashboard (neuer WebUI-Dienst `IBookingFilter`): Ist die Eingabe eine Zahl
+        (Ziffern, höchstens ein Komma/Punkt), filtert sie den Betrag — Vorschlag von Claude: Betrag *beginnt* mit der
+        Eingabe („47“ findet 47,83 und 470,00). Sonst Kategorie (voller Pfad) ODER Beschreibung *enthält* die
+        Eingabe, ohne Groß-/Kleinschreibung; bei Fixposten-Buchungen zählt auch der Fixposten-Name, den die Liste als
+        Beschreibung zeigt. Die KPI-Kacheln bleiben ungefiltert; „x von y“ neben dem Feld.
+      - Betrag: Ab drei Ziffern sind die letzten beiden immer Cent, schon beim Tippen („1250“ → „12,50“), je Zahl
+        einer Rechnung (`IAmountExpressionEvaluator.FormatInput`). Ein- und zweistellige Zahlen bleiben ganze Euro
+        („5“ = 5 €, „50“ = 50 €, aber „500“ = 5,00 €). Getippte Kommas/Punkte werden verworfen („12,5“ → „1,25“),
+        weil das Komma sonst nicht vom automatisch gesetzten zu unterscheiden wäre; am Handy daher
+        `inputmode="numeric"` (Ziffernblock ohne Komma).
+      - Nachgezogen: `AmountExpressionEvaluator` loggt jetzt (rules.md: Logging Pflicht bei öffentlicher
+        Schnittstelle), nur ungültige Eingaben, ohne den Betrag.
+      WebUI-Tests 587 grün; neue E2E-Tests (Datum „Zuletzt“, Cent-Automatik, Filter) **nicht gelaufen**.
+- [x] + / − -Knöpfe neben dem Betrag entfernt (11.10.2026, Vorgabe von Dirk: „sinnlos“); Tab führt aus dem Betrag
+      direkt in die Beschreibung. Rechnen geht weiter über die Tastatur; am Handy zeigt der Ziffernblock
+      (`inputmode="numeric"`) kein + und −, dort ist Rechnen damit praktisch nicht mehr möglich.
+- [x] Phase 2 Autovervollständigung in der Beschreibung (11.10.2026, mit Dirk abgestimmt):
+      - Datenquelle: direkt die Buchungen, keine eigene Top-50-Tabelle (Dirks Frage; Begründung: seltene Buchungen
+        wie „Kfz-Versicherung“ fielen aus einer Top-Liste heraus, eine zweite Tabelle müsste bei jedem Anlegen/
+        Ändern/Löschen nachgezogen werden, und bei einigen tausend Buchungen ist die Abfrage ohnehin schnell).
+        `IBookingManager.GetBookingSuggestionsAsync` liefert alle Kombinationen aus (getrimmter) Beschreibung und
+        Kategorie mit Häufigkeit und letztem Datum — einmal beim Öffnen des Dialogs (und nach „Speichern &
+        weitere“), gefiltert wird je Tastendruck im Speicher, ohne Datenbankzugriff.
+      - Neue Komponente `GwiOSBookingDescriptionBox`: ab 2 Zeichen bis zu 8 Vorschläge unter dem Feld, jeweils Text
+        und Kategoriepfad; zuerst Treffer am Wortanfang, dann sonstige Treffer, je nach Häufigkeit, dann Aktualität.
+        Dieselbe Beschreibung mit verschiedenen Kategorien erscheint als eigene Zeilen. ↓/↑ markieren (anfangs ist
+        nichts markiert, Enter übernimmt also nicht versehentlich), Enter/Klick übernimmt, Escape schließt nur die
+        Liste (nicht den Dialog), Verlassen des Feldes schließt sie.
+      - Übernehmen setzt Beschreibung, Kategorie und Typ (überschreibt eine schon gewählte Kategorie, wie die
+        Favoriten) und setzt den Cursor in den Betrag. **Der Betrag wird nie vorgeschlagen** (Vorgabe von Dirk) —
+        daher auch kein grauer Platzhalter; die „Häufig“-Chips der Vorlage entfallen.
+      Tests: Core-Unit grün (Integrationstests `GetSuggestionsAsync` **nicht gelaufen**), WebUI 600 grün; E2E-Test
+      `TheDescriptionSuggestsEarlierBookingsAndTakesOverTheirCategory` **nicht gelaufen**. Die E2E-Tests verlassen
+      die Beschreibung jetzt mit Tab, damit die Vorschlagsliste nichts verdeckt.
 - [ ] Phase 4 PWA/Handy: App-Shortcuts, Direktlink `/haushaltsbuch/buchen`, Plus-Knopf (FAB) und Liste statt Tabelle
       im Dashboard am Handy, Hinweis bei Verbindungsabbruch („Eingabe bleibt“) — in der Vorlage enthalten, nicht
       umgesetzt.
@@ -321,13 +362,38 @@ verschachteltes Bundle „Vorschlag2“ darin und lässt sich nur durch Entpacke
   egal ob gewählt oder getippt; ebenso zeigt der Stern unten ★, sobald die Kombination ein Favorit ist.
 - Favoriten-Kategorien beider Typen stehen als Chips da, Ausgaben zuerst; die Wahl einer Einnahme-Kategorie stellt
   den Typ auf Einnahme. Ohne markierte Kategorie erscheint ein Hinweis auf ☆ im Tab „Kategorien“.
-- Neue Buchungen bekommen immer „Heute“ als Datum, auch wenn im Dashboard ein anderer Monat gewählt ist (bisher: der
-  1. des gewählten Monats). Die Datums-Chips beziehen sich auf heute.
-- Rechnen im Betrag: nur + und −, Komma als Dezimaltrenner (mit Komma gelten Punkte als Tausender), ohne Komma ein
-  Punkt als Dezimaltrenner („42.50“). Ungültige Eingaben melden „Bitte einen gültigen Betrag eingeben …“.
+- Neue Buchungen bekommen „Heute“ als Datum, auch wenn im Dashboard ein anderer Monat gewählt ist (bisher: der
+  1. des gewählten Monats) — seit der Batch-Eingabe nur bis zur ersten Buchung der Sitzung, danach deren Datum. Die
+  Datums-Chips beziehen sich auf heute.
+- Rechnen im Betrag: nur + und −. (Die ursprüngliche Regel zu Komma und Punkt ist durch die Cent-Automatik ersetzt,
+  siehe oben.) Ungültige Eingaben melden „Bitte einen gültigen Betrag eingeben …“.
 - Rückgängig löscht die eben angelegte Buchung (nur nach „Speichern“, nicht nach „Speichern & weitere“).
 - Doppelte Favoriten (gleiche Beschreibung, gleiche Kategorie, ohne Groß-/Kleinschreibung) verhindert der Validator;
   dieselbe Beschreibung mit anderer Kategorie ist erlaubt.
+
+### Monatsübersicht im Dashboard (11.10.2026, Vorgabe von Dirk)
+
+- [x] Zwei Buttons über dem Buchungsfilter: „Monatsübersicht anzeigen“ (Dialog) und „Monatsübersicht drucken“
+      (PDF-Download, Link mit `download`; im Dialog zusätzlich „Als PDF“). Beide für den im Dashboard gewählten Monat.
+- [x] Aufbau wie eine Bilanz, aber untereinander: erst Einnahmen, dann Ausgaben, je Kategorienbaum mit den Spalten
+      „direkt“ (Buchungen in der Kategorie selbst) und „gesamt“ (rekursiv mit allen Unterkategorien), dann
+      „Summe Einnahmen/Ausgaben“ und „Saldo“. Core: `MonthOverviewWorkflow`; WebUI: `GwiOSMonthOverview`,
+      `MonthOverviewPdfRenderer` (QuestPDF, Druckfarben wie die Fixkosten-Prognose), Endpoint
+      `GET /api/haushaltsbuch/monatsuebersicht?monat=JJJJ-MM` (400 bei fehlendem/falschem Monat). Das PDF wird bei
+      jedem Aufruf neu erzeugt und nicht auf dem Server gespeichert.
+- [x] Staffelform (Vorgabe von Dirk, 11.10.2026): statt der Spalten „direkt“/„gesamt“ eine Betragsspalte je Ebene —
+      ganz rechts die Hauptkategorien, jede Unterebene eine Spalte weiter links, so dass jede Ebene allein
+      untereinander steht; Summen und Saldo ganz rechts. Gemeinsame Aufbereitung für Dialog und PDF in
+      `MonthOverviewLayout` (WebUI). Hat eine Kategorie mit Unterkategorien auch eigene Buchungen, steht deren Anteil
+      als eigene Zeile „Haushalt (direkt)“ (kursiv) auf der Ebene der Unterkategorien, damit jede Spalte die Zahl der
+      Ebene darüber ergibt (Vorschlag von Claude).
+- Entscheidungen von Claude (noch nicht von Dirk gegengeprüft): gebuchte **und** ausstehende Buchungen zählen (wie
+  die Kacheln „Gesamteinnahmen/-ausgaben“), das PDF sagt das im Kopf; Kategorien ohne Buchungen in oder unter sich
+  werden weggelassen; Sortierung nach Namen, „(direkt)“ jeweils nach den Unterkategorien; der Filter über der Liste
+  wirkt nicht auf die Übersicht.
+- Tests: Core-Unit (`GetMonthOverviewAsync`) und WebUI (Komponente, Layout, Renderer, Endpoint; 623) grün; PDF
+  erzeugt und angesehen (auch die Staffelform); E2E-Test `TheMonthOverviewShowsTheBookedCategoriesAndCanBeDownloadedAsPdf` **nicht
+  gelaufen**; der Dialog wurde nicht im Browser angesehen.
 
 ### Testinfrastruktur: lokale Postgres-DB und Playwright-E2E-Tests
 

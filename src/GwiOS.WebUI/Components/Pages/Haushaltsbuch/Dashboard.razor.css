@@ -15,6 +15,30 @@
     gap: 14px;
 }
 
+.gwios-dashboard-overview-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.gwios-dashboard-filter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.gwios-dashboard-filter ::deep .gwios-input {
+    flex: 1;
+    max-width: 480px;
+}
+
+.gwios-dashboard-filter-count {
+    color: var(--gwios-text-dim);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .gwios-dashboard-date {
     color: var(--gwios-text-muted);
     white-space: nowrap;

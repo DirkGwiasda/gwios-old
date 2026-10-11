@@ -8,9 +8,10 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 
 /// <summary>
 /// Large amount field of the booking entry: shows the sign of the booking type, opens the numeric keyboard on phones,
-/// and accepts short calculations such as <c>12,50+3,20</c>, whose result it shows below the field. Characters that
-/// cannot be part of an amount are dropped while typing. The text itself is the value; the caller evaluates it with
-/// <see cref="IAmountExpressionEvaluator"/> when saving.
+/// and accepts short calculations such as <c>12,50+3,20</c>, whose result it shows below the field. While typing,
+/// the text is formatted with <see cref="IAmountExpressionEvaluator.FormatInput"/>: only digits and signs are kept,
+/// and from three digits on the last two are the cents (<c>1250</c> shows as <c>12,50</c>). The text itself is the
+/// value; the caller evaluates it with <see cref="IAmountExpressionEvaluator"/> when saving.
 /// </summary>
 public partial class GwiOSAmountBox
 {
@@ -55,7 +56,7 @@ public partial class GwiOSAmountBox
     /// Explanation below the field, shown while there is neither an error nor a calculation result.
     /// </summary>
     [Parameter]
-    public string Hint { get; set; } = "Rechnen geht auch, z. B. 12,50+3,20";
+    public string Hint { get; set; } = "Ab drei Ziffern sind die letzten beiden Cent: 1250 → 12,50. Rechnen mit + und −.";
 
     /// <summary>
     /// Error shown below the field and marking it as invalid, or <c>null</c> while the value is valid.
@@ -94,7 +95,20 @@ public partial class GwiOSAmountBox
     }
 
     private async Task OnInputAsync(ChangeEventArgs eventArgs)
-        => await UpdateValueAsync(KeepAmountCharacters(eventArgs.Value?.ToString() ?? string.Empty));
+    {
+        string typedText = eventArgs.Value?.ToString() ?? string.Empty;
+        string formattedText = AmountExpressionEvaluator.FormatInput(typedText);
+        if ((formattedText == Value) && (formattedText != typedText))
+        {
+            // A dropped character (e.g. a comma) leaves the formatted text unchanged, so a render would not write it
+            // back and the field would keep showing the character. Rendering the typed text first makes the second
+            // render replace it.
+            Value = typedText;
+            await Task.Yield();
+        }
+
+        await UpdateValueAsync(formattedText);
+    }
 
     private async Task OnKeyDownAsync(KeyboardEventArgs eventArgs)
     {
@@ -103,17 +117,6 @@ public partial class GwiOSAmountBox
             await OnEnter.InvokeAsync();
         }
     }
-
-    // A sign typed right after another one replaces it, so "5+" followed by "−" becomes "5-".
-    private async Task AppendOperatorAsync(char sign)
-    {
-        string text = Value.TrimEnd('+', '-', '\u2212');
-        await UpdateValueAsync(text + sign);
-        await _inputElement.FocusAsync();
-    }
-
-    private static string KeepAmountCharacters(string text)
-        => new([.. text.Where(character => char.IsAsciiDigit(character) || ",.+-−".Contains(character))]);
 
     private async Task UpdateValueAsync(string value)
     {

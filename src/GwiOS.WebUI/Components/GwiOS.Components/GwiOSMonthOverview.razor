@@ -1,0 +1,47 @@
+<div class="gwios-month-overview" style="--gwios-month-overview-levels: @_levelCount;">
+    @foreach ((string title, IReadOnlyList<MonthOverviewNode> nodes, decimal total, string accent) in Sections)
+    {
+        <section class="gwios-month-overview-section" aria-label="@title">
+            <div class="gwios-month-overview-row gwios-month-overview-row--section">
+                <span class="gwios-month-overview-title gwios-month-overview-title--@accent">@title</span>
+            </div>
+            @if (nodes.Count == 0)
+            {
+                <p class="gwios-month-overview-empty">Keine @title in diesem Monat.</p>
+            }
+            @foreach (MonthOverviewRow row in MonthOverviewLayout.CreateRows(nodes))
+            {
+                <div class="gwios-month-overview-row @(row.Depth == 0 ? "gwios-month-overview-row--root" : null) @(row.IsDirectShare ? "gwios-month-overview-row--direct" : null)">
+                    <span class="gwios-month-overview-name" style="padding-left: @(row.Depth * 18)px;">
+                        <span class="gwios-chip-dot" style="background-color: @row.Color;"></span>
+                        @row.Name
+                    </span>
+                    @for (int level = _levelCount - 1; level >= 0; level--)
+                    {
+                        <span class="gwios-month-overview-amount @(level == 0 ? $"gwios-month-overview-amount--{accent}" : null)">
+                            @(level == row.Depth ? FormatAmount(row.Amount) : null)
+                        </span>
+                    }
+                </div>
+            }
+            <div class="gwios-month-overview-row gwios-month-overview-row--total">
+                <span>Summe @title</span>
+                @for (int level = _levelCount - 1; level >= 1; level--)
+                {
+                    <span></span>
+                }
+                <span class="gwios-month-overview-amount gwios-month-overview-amount--@accent">@FormatAmount(total)</span>
+            </div>
+        </section>
+    }
+    <div class="gwios-month-overview-row gwios-month-overview-row--balance">
+        <span>Saldo</span>
+        @for (int level = _levelCount - 1; level >= 1; level--)
+        {
+            <span></span>
+        }
+        <span class="gwios-month-overview-amount gwios-month-overview-amount--@(Overview.Balance >= 0 ? "income" : "expense")">
+            @FormatSignedAmount(Overview.Balance)
+        </span>
+    </div>
+</div>

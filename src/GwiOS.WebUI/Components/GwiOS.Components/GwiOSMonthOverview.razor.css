@@ -1,0 +1,115 @@
+.gwios-month-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gwios-month-overview-section {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Name links, rechts je Ebene eine Betragsspalte: ganz rechts die Hauptkategorien, jede Unterebene eine Spalte
+   weiter links (Staffelform). Die Zahl der Spalten setzt die Komponente als --gwios-month-overview-levels. */
+.gwios-month-overview-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(var(--gwios-month-overview-levels, 1), minmax(84px, auto));
+    align-items: center;
+    gap: 12px;
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--gwios-border-subtle);
+    font-size: 13.5px;
+}
+
+.gwios-month-overview-row > :nth-child(n + 2) {
+    text-align: right;
+}
+
+.gwios-month-overview-row--section > :first-child {
+    grid-column: 1 / -1;
+}
+
+.gwios-month-overview-row--section {
+    border-bottom: 1px solid rgba(0, 136, 255, 0.3);
+}
+
+.gwios-month-overview-title {
+    font-family: var(--gwios-font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.gwios-month-overview-title--income {
+    color: var(--gwios-success);
+}
+
+.gwios-month-overview-title--expense {
+    color: var(--gwios-danger);
+}
+
+.gwios-month-overview-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--gwios-text-muted);
+}
+
+.gwios-month-overview-row--root .gwios-month-overview-name {
+    color: var(--gwios-text);
+    font-weight: 600;
+}
+
+/* Beträge der Unterebenen etwas zurückgenommen, die Hauptkategorien rechts in der Farbe des Typs. */
+.gwios-month-overview-amount {
+    color: var(--gwios-text-muted);
+}
+
+.gwios-month-overview-row--direct .gwios-month-overview-name {
+    color: var(--gwios-text-dim);
+    font-style: italic;
+}
+
+.gwios-month-overview-amount--income {
+    color: var(--gwios-success);
+}
+
+.gwios-month-overview-amount--expense {
+    color: var(--gwios-danger);
+}
+
+.gwios-month-overview-row--total,
+.gwios-month-overview-row--balance {
+    font-weight: 700;
+}
+
+.gwios-month-overview-row--total {
+    border-bottom: none;
+}
+
+.gwios-month-overview-row--balance {
+    border-top: 2px solid rgba(0, 136, 255, 0.35);
+    border-bottom: none;
+    font-size: 15px;
+}
+
+.gwios-month-overview-empty {
+    margin: 0;
+    padding: 8px 4px;
+    color: var(--gwios-text-dim);
+    font-size: 13px;
+}
+
+@media (max-width: 820px) {
+    .gwios-month-overview-row {
+        grid-template-columns: minmax(0, 1fr) repeat(var(--gwios-month-overview-levels, 1), minmax(68px, auto));
+        gap: 8px;
+        font-size: 12.5px;
+    }
+}
+
+.gwios-month-overview-row--root .gwios-month-overview-amount {
+    font-weight: 600;
+}

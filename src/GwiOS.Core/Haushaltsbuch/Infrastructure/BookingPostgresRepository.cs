@@ -58,6 +58,14 @@ internal sealed class BookingPostgresRepository(NpgsqlDataSource dataSource, ILo
         ORDER BY date DESC, id
         """;
 
+    private const string SelectSuggestionsSql = """
+        SELECT btrim(description) AS description, category_id, count(*) AS usage_count, max(date) AS last_used_on
+        FROM haushaltsbuch.bookings
+        WHERE btrim(description) <> ''
+        GROUP BY btrim(description), category_id
+        ORDER BY usage_count DESC, last_used_on DESC, description
+        """;
+
     private const string DeleteSql = """
         DELETE FROM haushaltsbuch.bookings
         WHERE id = @id
@@ -107,6 +115,25 @@ internal sealed class BookingPostgresRepository(NpgsqlDataSource dataSource, ILo
         }
 
         return bookings;
+    }
+
+    public async Task<List<BookingSuggestion>> GetSuggestionsAsync(CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlCommand command = _dataSource.CreateCommand(SelectSuggestionsSql);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        List<BookingSuggestion> suggestions = [];
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            suggestions.Add(new BookingSuggestion
+            {
+                Description = reader.GetString("description"),
+                CategoryId = reader.GetGuid("category_id"),
+                UsageCount = (int)reader.GetInt64("usage_count"),
+                LastUsedOn = reader.GetFieldValue<DateOnly>("last_used_on")
+            });
+        }
+
+        return suggestions;
     }
 
     public async Task DeleteAsync(Guid bookingId, CancellationToken cancellationToken = default)

@@ -9,7 +9,7 @@
         <div class="gwios-toolbar-panel gwios-dashboard-toolbar">
             <GwiOSMonthSwitcher Month="_month" MonthChanged="ChangeMonthAsync" />
             <div class="gwios-dashboard-toolbar-actions">
-                <button type="button" class="gwios-button" @onclick="() => OpenNewBooking()">+ Neue Buchung</button>
+                <button type="button" class="gwios-button" @onclick="OpenNewBookingAsync">+ Neue Buchung</button>
                 <button type="button"
                         class="gwios-button"
                         disabled="@(_proposedBookings.Count == 0)"
@@ -41,6 +41,36 @@
                           FooterRightAccent="@(BookedBalance >= 0 ? GwiOSKpiAccent.Success : GwiOSKpiAccent.Danger)" />
         </div>
 
+        <div class="gwios-dashboard-overview-actions">
+            <button type="button"
+                    class="gwios-button gwios-button--secondary"
+                    aria-haspopup="dialog"
+                    @onclick="OpenMonthOverviewAsync">
+                Monatsübersicht anzeigen
+            </button>
+            @* A plain link, so the browser handles the download itself; "download" keeps Blazor from routing it. *@
+            <a class="gwios-button gwios-button--secondary"
+               href="@MonthOverviewPdfUrl"
+               download
+               data-enhance-nav="false">
+                Monatsübersicht drucken
+            </a>
+        </div>
+
+        <div class="gwios-dashboard-filter">
+            <GwiOSTextBox Value="@_filterText"
+                          ValueChanged="ChangeFilter"
+                          Placeholder="Buchungen filtern: Kategorie, Beschreibung oder Betrag"
+                          AriaLabel="Buchungen filtern"
+                          type="search"
+                          autocomplete="off"
+                          enterkeyhint="search" />
+            @if (IsFiltered)
+            {
+                <span class="gwios-dashboard-filter-count">@_visibleBookings.Count von @_bookings.Count</span>
+            }
+        </div>
+
         <div class="gwios-table-panel">
             <table class="gwios-table gwios-table--compact">
                 <thead>
@@ -55,7 +85,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (Booking booking in _bookings)
+                    @foreach (Booking booking in _visibleBookings)
                     {
                         <tr @key="booking.Id">
                             <td data-label="Datum" class="gwios-dashboard-date">@booking.Date.ToString("dd.MM.yyyy")</td>
@@ -101,7 +131,7 @@
                                     <button type="button"
                                             class="gwios-icon-button gwios-icon-button--primary"
                                             title="Bearbeiten"
-                                            @onclick="() => OpenEditBooking(booking)">
+                                            @onclick="() => OpenEditBookingAsync(booking)">
                                         ✎
                                     </button>
                                     <GwiOSConfirmButton Title="Löschen"
@@ -121,6 +151,10 @@
             @if (_bookings.Count == 0)
             {
                 <p class="gwios-empty">Für diesen Monat sind noch keine Buchungen erfasst.</p>
+            }
+            else if (_visibleBookings.Count == 0)
+            {
+                <p class="gwios-empty">Keine Buchung passt zu „@_filterText.Trim()“.</p>
             }
         </div>
     </div>
@@ -157,13 +191,14 @@
                                 OnEnter="SaveBookingAsync" />
             </GwiOSFormField>
             <GwiOSFormField Label="Beschreibung" InputId="booking-edit-description">
-                <GwiOSTextBox id="booking-edit-description"
-                              Value="@_editDescription"
-                              ValueChanged="ChangeDescription"
-                              Placeholder="z. B. Edeka"
-                              MaxLength="200"
-                              enterkeyhint="next"
-                              autocomplete="off" />
+                <GwiOSBookingDescriptionBox InputId="booking-edit-description"
+                                            Value="@_editDescription"
+                                            ValueChanged="ChangeDescription"
+                                            Suggestions="_bookingSuggestions"
+                                            Categories="_categories"
+                                            OnSuggestionSelected="ApplySuggestion"
+                                            Placeholder="z. B. Edeka"
+                                            MaxLength="200" />
             </GwiOSFormField>
             <GwiOSCategoryPicker Categories="_categories"
                                  SelectedCategoryId="_editCategoryId"
@@ -173,7 +208,9 @@
                                  ErrorMessage="@_categoryError" />
             <div class="gwios-booking-section">
                 <span class="gwios-booking-section-label">Datum</span>
-                <GwiOSDateChips @bind-Value="_editDate" Today="Today" />
+                <GwiOSDateChips @bind-Value="_editDate"
+                                Today="Today"
+                                RecentDate="@(IsNewBooking ? BookingEntrySession.LastBookingDate : null)" />
             </div>
             <div class="gwios-booking-more">
                 <button type="button"
@@ -223,6 +260,23 @@
                 @(_isSaving ? "Speichert …" : "Speichern")
             </button>
         </Actions>
+    </GwiOSDialog>
+}
+
+@if (_monthOverview is not null)
+{
+    <GwiOSDialog Title="@($"Monatsübersicht {MonthLabel}")" OnClose="() => _monthOverview = null">
+        <HeaderContent>
+            <a class="gwios-button gwios-button--compact"
+               href="@MonthOverviewPdfUrl"
+               download
+               data-enhance-nav="false">
+                Als PDF
+            </a>
+        </HeaderContent>
+        <ChildContent>
+            <GwiOSMonthOverview Overview="_monthOverview" />
+        </ChildContent>
     </GwiOSDialog>
 }
 

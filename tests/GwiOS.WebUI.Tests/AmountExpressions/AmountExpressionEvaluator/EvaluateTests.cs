@@ -1,4 +1,6 @@
+using GwiOS.Core.CrossCutting.Logging.Domain.Contracts.Models;
 using GwiOS.WebUI.AmountExpressions.Contracts.Models;
+using GwiOS.WebUI.Tests.TestInfrastructure;
 using AmountExpressionEvaluatorUnderTest = GwiOS.WebUI.AmountExpressions.AmountExpressionEvaluator;
 
 namespace GwiOS.WebUI.Tests.AmountExpressions.AmountExpressionEvaluator;
@@ -8,7 +10,13 @@ namespace GwiOS.WebUI.Tests.AmountExpressions.AmountExpressionEvaluator;
 /// </summary>
 public sealed class EvaluateTests
 {
-    private readonly AmountExpressionEvaluatorUnderTest _evaluator = new();
+    private readonly LoggerFake<AmountExpressionEvaluatorUnderTest> _logger = new();
+    private readonly AmountExpressionEvaluatorUnderTest _evaluator;
+
+    public EvaluateTests()
+    {
+        _evaluator = new AmountExpressionEvaluatorUnderTest(_logger);
+    }
 
     [Theory]
     [InlineData("47,83", 47.83)]
@@ -69,5 +77,24 @@ public sealed class EvaluateTests
 
         Assert.Null(result.Value);
         Assert.False(result.IsCalculation);
+    }
+
+    [Fact]
+    public void LogsAnInvalidTextWithoutTheText()
+    {
+        _evaluator.Evaluate("12,50+");
+
+        LogEntry logEntry = Assert.Single(_logger.Entries);
+        Assert.Equal(LogLevel.Debug, logEntry.LogLevel);
+        Assert.Equal("Amount expression is invalid.", logEntry.Message);
+        Assert.Empty(logEntry.ContextData);
+    }
+
+    [Fact]
+    public void LogsNothing_WhenTheTextIsValid()
+    {
+        _evaluator.Evaluate("12,50+3,20");
+
+        Assert.Empty(_logger.Entries);
     }
 }

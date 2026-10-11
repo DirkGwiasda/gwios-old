@@ -4,6 +4,11 @@
     display: flex;
 }
 
+.gwios-date-chips-custom .gwios-chip {
+    min-width: 48px;
+    justify-content: center;
+}
+
 .gwios-date-chips-picker {
     position: absolute;
     inset: 0;
@@ -12,4 +17,17 @@
     opacity: 0;
     cursor: pointer;
     color-scheme: dark;
+}
+
+/* Chrome und Edge öffnen den Kalender nur beim Klick auf ihr Kalendersymbol am rechten Rand des Feldes; ein Klick
+   daneben setzte nur den Cursor in Tag, Monat oder Jahr, und der Chip schien nicht zu reagieren. Das Symbol wird
+   deshalb über das ganze Feld gezogen. */
+.gwios-date-chips-picker::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
 }

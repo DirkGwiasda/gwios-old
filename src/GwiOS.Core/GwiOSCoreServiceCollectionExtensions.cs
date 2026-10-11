@@ -26,6 +26,8 @@ using GwiOS.Core.Haushaltsbuch.Domain.Workflows.CategoryDeletion;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.CategoryDeletion.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.HaushaltsbuchOverview.Contracts;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview;
+using GwiOS.Core.Haushaltsbuch.Domain.Workflows.MonthOverview.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contracts;
 using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringItemContinuation;
@@ -186,6 +188,7 @@ public static class GwiOSCoreServiceCollectionExtensions
         services.AddScoped<IRecurringItemForecastWorkflow, RecurringItemForecastWorkflow>();
         services.AddScoped<IAvailableBalanceWorkflow, AvailableBalanceWorkflow>();
         services.AddScoped<IRecurringItemContinuationWorkflow, RecurringItemContinuationWorkflow>();
+        services.AddScoped<IMonthOverviewWorkflow, MonthOverviewWorkflow>();
     }
 
     // Satellites answer within milliseconds in the LAN; a satellite that does not must not hold up the others for long.

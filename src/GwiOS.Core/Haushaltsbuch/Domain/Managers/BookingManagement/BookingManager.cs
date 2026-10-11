@@ -35,6 +35,9 @@ internal sealed class BookingManager(
         CancellationToken cancellationToken = default)
         => await _bookingRepository.GetInRangeAsync(fromDate, toDate, cancellationToken);
 
+    public async Task<List<BookingSuggestion>> GetBookingSuggestionsAsync(CancellationToken cancellationToken = default)
+        => await _bookingRepository.GetSuggestionsAsync(cancellationToken);
+
     public async Task DeleteBookingAsync(Guid bookingId, CancellationToken cancellationToken = default)
     {
         await _bookingRepository.DeleteAsync(bookingId, cancellationToken);
