@@ -16,6 +16,7 @@ using GwiOS.Core.Haushaltsbuch.Domain.Workflows.RecurringBookingGeneration.Contr
 using GwiOS.WebUI.AmountExpressions.Contracts;
 using GwiOS.WebUI.BookingEntry.Contracts;
 using GwiOS.WebUI.BookingFilters.Contracts;
+using GwiOS.WebUI.MonthOverviews;
 using GwiOS.WebUI.Components.GwiOS.Components;
 using GwiOS.WebUI.StatusMessages.Contracts;
 using GwiOS.WebUI.StatusMessages.Contracts.Models;
@@ -34,7 +35,7 @@ namespace GwiOS.WebUI.Components.Pages.Haushaltsbuch;
 /// Within a session, a new booking starts with the date of the booking entered last, which also stays available as
 /// a chip, so that the receipts of an older day can be entered one after another. A text box above the list filters
 /// the bookings by category, description or amount. Above it, the month can be shown as an overview along the
-/// category tree, in a dialog or as a PDF to print.
+/// category tree, in a dialog or as a PDF to print; in the dialog, a click on a category shows its bookings.
 /// </summary>
 public partial class Dashboard
 {
@@ -79,6 +80,7 @@ public partial class Dashboard
 
     private UndoBarState? _undoBar;
     private MonthOverviewData? _monthOverview;
+    private MonthOverviewRow? _selectedOverviewRow;
 
     [Inject]
     private IBookingManager BookingManager { get; set; } = default!;
@@ -154,7 +156,8 @@ public partial class Dashboard
         => IsNewBooking ? "Neue Buchung" : "Buchung bearbeiten";
 
     private string MoreLabel
-        => $"{(_isMoreOpen ? "▾ Weniger" : "▸ Mehr")} · {(_editStatus == BookingStatus.Booked ? "Gebucht" : "Ausstehend")}";
+        => $"{(_isMoreOpen ? "▾ Weniger" : "▸ Mehr")} · "
+            + (_editStatus == BookingStatus.Booked ? "Gebucht" : "Ausstehend");
 
     // The favorite matching the description and category in the form, so picking it or typing the same marks it.
     private Guid? ActiveTemplateId
@@ -457,7 +460,16 @@ public partial class Dashboard
     }
 
     private async Task OpenMonthOverviewAsync()
-        => _monthOverview = await MonthOverviewWorkflow.GetMonthOverviewAsync(_month);
+    {
+        _selectedOverviewRow = null;
+        _monthOverview = await MonthOverviewWorkflow.GetMonthOverviewAsync(_month);
+    }
+
+    private void CloseMonthOverview()
+    {
+        _selectedOverviewRow = null;
+        _monthOverview = null;
+    }
 
     private void ToggleProposal(ProposedBooking proposal, bool isSelected)
     {

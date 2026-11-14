@@ -57,6 +57,22 @@
     color: var(--gwios-text-muted);
 }
 
+.gwios-month-overview-name--link {
+    padding-top: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.gwios-month-overview-name--link:hover {
+    color: var(--gwios-primary);
+    text-decoration: underline;
+}
+
 .gwios-month-overview-row--root .gwios-month-overview-name {
     color: var(--gwios-text);
     font-weight: 600;

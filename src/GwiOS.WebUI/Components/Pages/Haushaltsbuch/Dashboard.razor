@@ -265,7 +265,7 @@
 
 @if (_monthOverview is not null)
 {
-    <GwiOSDialog Title="@($"Monatsübersicht {MonthLabel}")" OnClose="() => _monthOverview = null">
+    <GwiOSDialog Title="@($"Monatsübersicht {MonthLabel}")" OnClose="CloseMonthOverview">
         <HeaderContent>
             <a class="gwios-button gwios-button--compact"
                href="@MonthOverviewPdfUrl"
@@ -275,7 +275,19 @@
             </a>
         </HeaderContent>
         <ChildContent>
-            <GwiOSMonthOverview Overview="_monthOverview" />
+            <GwiOSMonthOverview Overview="_monthOverview" OnCategorySelected="row => _selectedOverviewRow = row" />
+            @* A local copy: after its close button was clicked, the inner dialog renders its content once more before the
+               outer dialog removes it, and by then the field is already null. *@
+            @if (_selectedOverviewRow is MonthOverviewRow selectedRow)
+            {
+                <GwiOSDialog Title="@($"{selectedRow.Name} · {MonthLabel}")" OnClose="() => _selectedOverviewRow = null">
+                    <GwiOSCategoryBookings CategoryId="selectedRow.CategoryId"
+                                           IncludeSubCategories="!selectedRow.IsDirectShare"
+                                           Bookings="_bookings"
+                                           Categories="_categories"
+                                           RecurringItems="_recurringItems" />
+                </GwiOSDialog>
+            }
         </ChildContent>
     </GwiOSDialog>
 }

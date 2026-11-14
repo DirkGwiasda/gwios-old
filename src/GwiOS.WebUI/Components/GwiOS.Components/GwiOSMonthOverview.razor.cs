@@ -9,7 +9,8 @@ namespace GwiOS.WebUI.Components.GwiOS.Components;
 /// Shows the bookings of one month like a balance sheet, but one below the other: first the income, then the
 /// expenses, each as the category tree in stepped form (see <see cref="MonthOverviewLayout"/>): the root categories
 /// in the rightmost amount column, each level of sub-categories one column further left. Then the totals and the
-/// balance, in the rightmost column.
+/// balance, in the rightmost column. If <see cref="OnCategorySelected"/> is set, every line can be clicked, e.g. to
+/// show its bookings.
 /// </summary>
 public partial class GwiOSMonthOverview
 {
@@ -22,6 +23,13 @@ public partial class GwiOSMonthOverview
     /// </summary>
     [Parameter, EditorRequired]
     public MonthOverviewData Overview { get; set; } = default!;
+
+    /// <summary>
+    /// Raised with the line the user clicks; or not set, then the lines cannot be clicked. A category line stands for
+    /// the category with its sub-categories, a "(direkt)" line only for the bookings in the category itself.
+    /// </summary>
+    [Parameter]
+    public EventCallback<MonthOverviewRow> OnCategorySelected { get; set; }
 
     private (string Title, IReadOnlyList<MonthOverviewNode> Nodes, decimal Total, string Accent)[] Sections
         =>

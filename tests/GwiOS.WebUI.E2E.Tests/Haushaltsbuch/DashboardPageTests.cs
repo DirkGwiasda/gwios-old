@@ -336,7 +336,7 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TheMonthOverviewShowsTheBookedCategoriesAndCanBeDownloadedAsPdf()
+    public async Task TheMonthOverviewShowsTheBookedCategoriesWithTheirBookingsAndCanBeDownloadedAsPdf()
     {
         await using TestDataSeeder seeder = new();
         Category category = await seeder.CreateExpenseCategoryAsync();
@@ -354,6 +354,15 @@ public sealed class DashboardPageTests(GwiOSAppFixture app) : IAsyncLifetime
         ILocator dialog = _page.GetByRole(AriaRole.Dialog, new() { Name = "Monatsübersicht" });
         await Expect(dialog.GetByText("Einnahmen", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(dialog.Locator(".gwios-month-overview-row", new() { HasText = category.Name })).ToContainTextAsync("7,77 €");
+
+        await dialog.GetByRole(AriaRole.Button, new() { Name = category.Name, Exact = true }).ClickAsync();
+        ILocator bookingsDialog = _page.GetByRole(AriaRole.Dialog, new() { Name = $"{category.Name} ·" });
+        await Expect(bookingsDialog.Locator(".gwios-category-bookings-row", new() { HasText = description }))
+            .ToContainTextAsync("7,77 €");
+        // The close button, not Escape: closing a dialog inside a dialog that way once failed with an exception.
+        await bookingsDialog.GetByRole(AriaRole.Button, new() { Name = "Schließen" }).ClickAsync();
+        await Expect(bookingsDialog).ToBeHiddenAsync();
+        await Expect(dialog).ToBeVisibleAsync();
 
         await CleanUpBookingAsync(seeder, description);
     }

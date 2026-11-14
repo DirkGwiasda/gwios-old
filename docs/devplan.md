@@ -387,12 +387,26 @@ verschachteltes Bundle „Vorschlag2“ darin und lässt sich nur durch Entpacke
       `MonthOverviewLayout` (WebUI). Hat eine Kategorie mit Unterkategorien auch eigene Buchungen, steht deren Anteil
       als eigene Zeile „Haushalt (direkt)“ (kursiv) auf der Ebene der Unterkategorien, damit jede Spalte die Zahl der
       Ebene darüber ergibt (Vorschlag von Claude).
+- [x] Buchungen je Kategorie (Vorgabe von Dirk, 11.10.2026): Im Dialog (nicht im PDF) ist jede Zeile der Übersicht
+      klickbar und öffnet ein zweites modales Popup (`GwiOSDialog` im Dialog) mit den Buchungen: Datum,
+      Beschreibung bzw. Fixposten, Kategoriepfad bei Unterkategorien, „Ausstehend“, Betrag, dann Anzahl und Summe
+      (`GwiOSCategoryBookings`, nur lesend). Eine Kategoriezeile zeigt die Buchungen einschließlich aller
+      Unterkategorien (passend zu ihrem Betrag), eine „(direkt)“-Zeile nur die der Kategorie selbst (Vorschlag von
+      Claude). Die Buchungen kommen aus den ohnehin geladenen Buchungen des Monats, ohne weiteren Datenbankzugriff.
+      Escape schließt nur das obere Popup.
+      Fehler behoben (11.10.2026, von Dirk gemeldet): Schließen dieses Popups über ✕ warf eine
+      `NullReferenceException`. Ein Dialog im Dialog rendert nach dem Klick auf ✕ seinen Inhalt noch einmal, bevor
+      der äußere Dialog ihn entfernt; der Inhalt las dabei das schon geleerte Feld `_selectedOverviewRow`. Er
+      arbeitet jetzt mit einer lokalen Kopie. **Regel für verschachtelte Dialoge:** Inhalte eines inneren Dialogs
+      dürfen den Zustand, der ihn öffnet, nicht direkt dereferenzieren, sondern nur eine im `@if` gebundene lokale
+      Variable (`@if (_feld is Typ lokal)`). Mit einem bUnit-Nachbau der Seite nachgestellt und die Korrektur damit
+      geprüft; der E2E-Test schließt das Popup jetzt über ✕.
 - Entscheidungen von Claude (noch nicht von Dirk gegengeprüft): gebuchte **und** ausstehende Buchungen zählen (wie
   die Kacheln „Gesamteinnahmen/-ausgaben“), das PDF sagt das im Kopf; Kategorien ohne Buchungen in oder unter sich
   werden weggelassen; Sortierung nach Namen, „(direkt)“ jeweils nach den Unterkategorien; der Filter über der Liste
   wirkt nicht auf die Übersicht.
-- Tests: Core-Unit (`GetMonthOverviewAsync`) und WebUI (Komponente, Layout, Renderer, Endpoint; 623) grün; PDF
-  erzeugt und angesehen (auch die Staffelform); E2E-Test `TheMonthOverviewShowsTheBookedCategoriesAndCanBeDownloadedAsPdf` **nicht
+- Tests: Core-Unit (`GetMonthOverviewAsync`) und WebUI (Komponenten, Layout, Renderer, Endpoint; 629) grün; PDF
+  erzeugt und angesehen (auch die Staffelform); E2E-Test `TheMonthOverviewShowsTheBookedCategoriesWithTheirBookingsAndCanBeDownloadedAsPdf` **nicht
   gelaufen**; der Dialog wurde nicht im Browser angesehen.
 
 ### Testinfrastruktur: lokale Postgres-DB und Playwright-E2E-Tests

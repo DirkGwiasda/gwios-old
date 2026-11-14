@@ -39,7 +39,8 @@ internal static class MonthOverviewLayout
 
     private static void Append(MonthOverviewNode node, int depth, string color, List<MonthOverviewRow> rows)
     {
-        rows.Add(new MonthOverviewRow(node.Category.Name, depth, node.TotalAmount, color, IsDirectShare: false));
+        rows.Add(new MonthOverviewRow(
+            node.Category.Id, node.Category.Name, depth, node.TotalAmount, color, IsDirectShare: false));
         foreach (MonthOverviewNode child in node.Children)
         {
             Append(child, depth + 1, color, rows);
@@ -47,7 +48,13 @@ internal static class MonthOverviewLayout
 
         if ((node.Children.Count > 0) && (node.BookingCount > 0))
         {
-            rows.Add(new MonthOverviewRow($"{node.Category.Name} (direkt)", depth + 1, node.OwnAmount, color, IsDirectShare: true));
+            rows.Add(new MonthOverviewRow(
+                node.Category.Id,
+                $"{node.Category.Name} (direkt)",
+                depth + 1,
+                node.OwnAmount,
+                color,
+                IsDirectShare: true));
         }
     }
 }

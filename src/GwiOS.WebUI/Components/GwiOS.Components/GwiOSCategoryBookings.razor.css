@@ -1,0 +1,55 @@
+.gwios-category-bookings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+.gwios-category-bookings-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.gwios-category-bookings-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--gwios-border-subtle);
+    font-size: 13.5px;
+}
+
+.gwios-category-bookings-date {
+    color: var(--gwios-text-muted);
+}
+
+.gwios-category-bookings-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.gwios-category-bookings-text ::deep .gwios-category-label {
+    color: var(--gwios-text-dim);
+    font-size: 12.5px;
+}
+
+.gwios-category-bookings-amount {
+    white-space: nowrap;
+}
+
+.gwios-category-bookings-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px;
+    font-weight: 700;
+}
+
+.gwios-category-bookings-empty {
+    margin: 0;
+    color: var(--gwios-text-dim);
+    font-size: 13px;
+}

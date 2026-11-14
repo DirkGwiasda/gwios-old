@@ -1,0 +1,39 @@
+<div class="gwios-category-bookings">
+    @if (_bookings.Count == 0)
+    {
+        <p class="gwios-category-bookings-empty">Keine Buchungen.</p>
+    }
+    else
+    {
+        <div class="gwios-category-bookings-list" role="list">
+            @foreach (Booking booking in _bookings)
+            {
+                <div class="gwios-category-bookings-row" role="listitem">
+                    <span class="gwios-category-bookings-date">@booking.Date.ToString("dd.MM.")</span>
+                    <span class="gwios-category-bookings-text">
+                        @if (!string.IsNullOrWhiteSpace(booking.Description))
+                        {
+                            <span>@booking.Description</span>
+                        }
+                        <GwiOSRecurringItemLabel RecurringItems="RecurringItems" RecurringItemId="booking.RecurringItemId" />
+                        @if (booking.CategoryId != CategoryId)
+                        {
+                            <GwiOSCategoryLabel Categories="Categories" CategoryId="booking.CategoryId" />
+                        }
+                        @if (booking.Status == BookingStatus.Pending)
+                        {
+                            <span class="gwios-badge gwios-badge--warning">Ausstehend</span>
+                        }
+                    </span>
+                    <span class="gwios-category-bookings-amount @(booking.Type == CategoryType.Income ? "gwios-amount--success" : "gwios-amount--danger")">
+                        @FormatAmount(booking.Amount)
+                    </span>
+                </div>
+            }
+        </div>
+        <div class="gwios-category-bookings-total">
+            <span>@(_bookings.Count == 1 ? "1 Buchung" : $"{_bookings.Count} Buchungen")</span>
+            <span>@FormatAmount(_bookings.Sum(booking => booking.Amount))</span>
+        </div>
+    }
+</div>

@@ -12,10 +12,25 @@
             @foreach (MonthOverviewRow row in MonthOverviewLayout.CreateRows(nodes))
             {
                 <div class="gwios-month-overview-row @(row.Depth == 0 ? "gwios-month-overview-row--root" : null) @(row.IsDirectShare ? "gwios-month-overview-row--direct" : null)">
-                    <span class="gwios-month-overview-name" style="padding-left: @(row.Depth * 18)px;">
-                        <span class="gwios-chip-dot" style="background-color: @row.Color;"></span>
-                        @row.Name
-                    </span>
+                    @if (OnCategorySelected.HasDelegate)
+                    {
+                        <button type="button"
+                                class="gwios-month-overview-name gwios-month-overview-name--link"
+                                style="padding-left: @(row.Depth * 18)px;"
+                                title="Buchungen anzeigen"
+                                aria-haspopup="dialog"
+                                @onclick="() => OnCategorySelected.InvokeAsync(row)">
+                            <span class="gwios-chip-dot" style="background-color: @row.Color;"></span>
+                            @row.Name
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="gwios-month-overview-name" style="padding-left: @(row.Depth * 18)px;">
+                            <span class="gwios-chip-dot" style="background-color: @row.Color;"></span>
+                            @row.Name
+                        </span>
+                    }
                     @for (int level = _levelCount - 1; level >= 0; level--)
                     {
                         <span class="gwios-month-overview-amount @(level == 0 ? $"gwios-month-overview-amount--{accent}" : null)">
